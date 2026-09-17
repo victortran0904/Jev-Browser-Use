@@ -54,3 +54,23 @@ After the specification pass, reviewed both fill scripts and the click script. T
 The full local suite passed **95 tests in 25 files** and **27 Node checks**. Typechecking caught a test fixture's missing HTMLInputElement annotation; after correcting only that annotation, all three focused browser regressions, typecheck, build and six harness assertions passed. Raw command logs preserve both the failed typecheck and corrected run.
 
 The older dirty `e2e-worktree` was also inspected and archived: its superseded page-global whole-snapshot cache is preserved as an explicitly non-production patch under `archive/`. Its useful behaviors already exist in the selected private-reference/membership-cache implementation. All current source fixes and the archival evidence are included in this commit; no superseded collector is reintroduced.
+
+## Action-aware editor readiness
+
+The public run at `35ffcc0` progressed through both origin and destination suggestions but exhausted the two-refresh limit on later editor changes. A fresh credential-free public-page timing probe found that an airport pop-up became visible approximately 350 ms after filling its declared combobox; observations collected before that still described the background form.
+
+Two further real-browser RED/GREEN cycles reproduce a declared delayed editor after direct filling and focused typing. Each failed before implementation and passed after adding bounded observation of the declared editor's expansion/focus transfer. Evidence: `editor-readiness-RED/GREEN.txt` and `editor-focus-RED/GREEN.txt`. A separate ordinary-field regression passed initially and verifies no unrelated popup deadline; it is not claimed as an additional RED/GREEN fix.
+
+### Editor-readiness stage 1 — specification self-review
+
+Only controls declaring a combobox role or dialog/listbox popup use a bounded readiness window. Plain fields resolve immediately. The condition watches expansion, disconnection or a visible focus transfer and stops as soon as it is satisfied; the 750 ms ceiling does not become a fixed sleep. This is advisory UI readiness, not proof that all asynchronous results have loaded. No input is repeated, no option is automatically selected, no form is submitted, and the agent's decision/recovery/provider budgets are unchanged.
+
+### Editor-readiness stage 2 — code-quality/safety self-review
+
+Reviewed both fill scripts and the shared readiness fragment after the specification pass. The readiness check is outside the pre-input recovery catch, so errors after a dispatched fill cannot be mislabeled as safe to replay. Only the optional readiness deadline is tolerated; other browser failures propagate. Element handles are still disposed in `finally`. Tests preserve unchanged-fill behavior and verify ordinary-field latency rather than weakening the prior navigation/focus assertions. This is a second self-review, not an independent-agent or external approval.
+
+The final native-browser verification also passed both ten-case suites on Oracle `free`, using the real Browser Control extension and relay. Controlled-fixture measurements: focus-click median 124 ms, redirect navigation 82 ms, Back recovery 145 ms. These are not a paired baseline comparison or universal website speedup.
+
+### Final CI portability review
+
+Provisioning a new temporary self-hosted runner was blocked by the platform; the denied provisioning action was not retried. VPS command access remains healthy. Final secret-backed verification therefore uses the existing GitHub-hosted workflow, separately labeled from completed Oracle testing. Review found its Chromium installation came after tests that now require Chromium. The config-only change moves installation before tests and serializes browser checks. Specification review confirms no tests, assertions, budgets or secret restrictions were removed. Subsequent quality review confirms unchanged pinned actions, repository/branch gates, read-only checkout and secret scoping. Hosted CI results must not be described as Oracle VPS results.

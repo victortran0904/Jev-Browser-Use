@@ -22,12 +22,12 @@ jobs:
         with:
           node-version: '22'
       - run: npm ci
-      - run: npm test
+      - run: node node_modules/playwright-core/cli.js install --with-deps --no-shell chromium
+      - run: npm test -- --maxWorkers=1
       - run: npm run typecheck
       - run: npm run build
-      - run: node node_modules/playwright-core/cli.js install --with-deps --no-shell chromium
       - name: Real-browser invariant regressions
-        run: node --import tsx --test integration/*.checks.mjs
+        run: node --import tsx --test --test-concurrency=1 integration/*.checks.mjs
   journeys:
     needs: regression
     if: github.repository == 'victortran0904/Jev-Browser-Use' && github.ref == 'refs/heads/perf/browser-architecture-20260917'
