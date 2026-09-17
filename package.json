@@ -1,0 +1,42 @@
+{
+  "name": "jev-browser-use",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently -k \"tsx watch server/index.ts\" \"vite\"",
+    "build": "tsc -b && vite build",
+    "typecheck": "tsc -b --pretty false",
+    "test": "vitest run",
+    "start": "NODE_ENV=production tsx server/index.ts",
+    "browser:doctor": "browser-control doctor",
+    "browser:extension-path": "node -e \"console.log(require('path').resolve('node_modules/@opencode-ai/browser-control/extension/dist'))\""
+  },
+  "dependencies": {
+    "@google/genai": "2.23.0",
+    "@opencode-ai/browser-control": "^0.7.1",
+    "@typesafe-ai/sdk": "^0.6.0",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^5.2.1",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/node": "^25.0.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@types/supertest": "^6.0.3",
+    "@vitejs/plugin-react": "^5.1.1",
+    "concurrently": "^9.2.1",
+    "jsdom": "^28.0.0",
+    "supertest": "^7.2.2",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "vite": "^7.3.1",
+    "vitest": "^4.0.18"
+  }
+}
