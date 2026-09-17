@@ -120,8 +120,8 @@ export function createBrowserBoundary(command: CommandRunner = defaultCommandRun
       const request={ref:target?.ref,signature:target?.signature,documentId:observation.documentId,text:action.kind==="type_text",focused:["type_text","press_enter"].includes(action.kind)};
       const resolve=`if(!state.__jevObserver || state.__jevObserverPage!==p) throw new Error("Stale observation: missing document");\nconst h=await state.__jevObserver.evaluateHandle((api,request)=>api.resolve(request),${JSON.stringify(request)}); const target=h.asElement(); if(!target) throw new Error("Stale observation: missing element");`;
       const scripts:Record<string,string>={
-        click_item:`${resolve}\ntry {await target.click({timeout:5000}); return "clicked item";} finally {await h.dispose();}`,
-        type_text:`${resolve}\ntry {await target.fill(${JSON.stringify(action.value??"")},{timeout:2000}); return "typed text into focused field";} finally {await h.dispose();}`,
+        click_item:`${resolve}\ntry {await target.click({timeout:5000}); return ${JSON.stringify(`clicked ${(target?.label ?? "item").split(" [value=")[0]}`)};} finally {await h.dispose();}`,
+        type_text:`${resolve}\ntry {await target.fill(${JSON.stringify(action.value??"")},{timeout:2000}); return ${JSON.stringify(`typed text into ${observation.focusedField?.label || "focused field"}`)};} finally {await h.dispose();}`,
         press_enter:observation.focusedField ? `${resolve}\ntry {await p.keyboard.press("Enter"); return "pressed Enter";} finally {await h.dispose();}` : `await p.keyboard.press("Enter"); return "pressed Enter";`,
         press_escape:`await p.keyboard.press("Escape"); return "pressed Escape";`,
         scroll_down:`await p.mouse.wheel(0,650); return "scrolled down";`,
