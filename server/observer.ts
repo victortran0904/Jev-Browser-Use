@@ -5,6 +5,7 @@ export function createObserver(documentId: string) {
     let nextRef = 0;
     let observedFocus: Element | null = null;
     let observedFocusValue = "";
+    let observedFocusSignature = "";
     const isSensitive = (el: Element) => (el.getAttribute("type") || "").toLowerCase() === "password"
         || /password|passcode|one.?time|(?:^|[ _-])otp|cc-|card.?number|credit|cvv|cvc|secret|token/i.test(["autocomplete", "name", "id", "aria-label", "placeholder"].map(key => el.getAttribute(key) || "").join(" "));
     const fieldValue = (el: Element) => "value" in el ? String((el as HTMLInputElement).value || "") : el.textContent || "";
@@ -21,8 +22,14 @@ export function createObserver(documentId: string) {
     };
     const currentElements = new Map<string, HTMLElement>();
     const signatures = new Map<string, string>();
+    const formSignature = (element: HTMLElement) => {
+        const form = element instanceof HTMLInputElement || element instanceof HTMLButtonElement
+            || element instanceof HTMLSelectElement || element instanceof HTMLTextAreaElement
+            ? element.form : element.closest("form");
+        return form ? [form.action, form.method, form.target, form.enctype, form.noValidate] : null;
+    };
     const signature = (element: HTMLElement) => JSON.stringify([
-        element.tagName, ...["type", "role", "aria-label", "name", "id", "href", "target", "formaction", "formtarget", "disabled", "readonly", "aria-disabled", "onclick"].map(key => element.getAttribute(key)),
+        formSignature(element), element.tagName, ...["type", "role", "aria-label", "name", "id", "href", "target", "formaction", "formtarget", "disabled", "readonly", "aria-disabled", "onclick"].map(key => element.getAttribute(key)),
         element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement ? element.value : element.textContent?.trim().slice(0, 500),
     ]);
     let cachedMatches: HTMLElement[] | undefined;
@@ -47,7 +54,7 @@ export function createObserver(documentId: string) {
         currentElements.clear();
         signatures.clear();
         const sensitiveValues = Array.from(document.querySelectorAll("input,textarea,[contenteditable=true]"))
-            .filter(isSensitive).map(fieldValue).filter(Boolean);
+            .filter(isSensitive).map(fieldValue).filter(Boolean).sort((a, b) => b.length - a.length);
         const redact = (text: string) => sensitiveValues.reduce((value, secret) => value.split(secret).join("[redacted]"), text);
         const selector = "a,button,input,textarea,select,[role=button],[role=link],[role=textbox],[role=searchbox],[contenteditable=true]";
         queueChanges(mutations.takeRecords());
@@ -114,6 +121,7 @@ export function createObserver(documentId: string) {
         }
         const el = document.activeElement;
         observedFocus = el;
+        observedFocusSignature = el instanceof HTMLElement ? signature(el) : "";
         observedFocusValue = el && !isSensitive(el) ? fieldValue(el) : "";
         let focusedField = null;
         if (el instanceof HTMLElement && el !== document.body)
@@ -133,7 +141,8 @@ export function createObserver(documentId: string) {
                 const style = getComputedStyle(parent);
                 if (!parent.getClientRects().length || style.visibility === "hidden" || style.display === "none")
                     continue;
-                const text = (node.textContent ?? "").replace(/\s+/g, " ").trim().slice(0, budget - length);
+                // Redact before normalization or truncation can expose a credential prefix.
+                const text = redact(node.textContent ?? "").replace(/\s+/g, " ").trim().slice(0, budget - length);
                 if (text) {
                     seenText.add(node);
                     parts.push(text);
@@ -183,7 +192,8 @@ export function createObserver(documentId: string) {
         resolveFocus(expectedDocumentId: string) {
             const element = observedFocus;
             if (expectedDocumentId !== documentId || !element?.isConnected || document.activeElement !== element
-                || isSensitive(element) || fieldValue(element) !== observedFocusValue)
+                || isSensitive(element) || fieldValue(element) !== observedFocusValue
+                || !(element instanceof HTMLElement) || signature(element) !== observedFocusSignature)
                 throw new Error("Stale or sensitive focused field; observe again");
             return element;
         },
