@@ -1,4 +1,4 @@
-const kinds=new Set(['open_site','click_item','type_text','press_enter','press_escape','scroll_down','scroll_up','back','wait','done','none']);
+const kinds=new Set(['open_site','click_item','fill_item','type_text','press_enter','press_escape','scroll_down','scroll_up','back','wait','done','none']);
 export function traceStep(action,observation,steps=[]) {
   const target=observation.candidates.find(c=>c.ref===action.target);
   return {kind:kinds.has(action.kind)?action.kind:'invalid',targetIndex:steps.findIndex(s=>s[1]&&target?.label.includes(s[1])),fieldIndex:steps.findIndex(s=>s[0]==='fill'&&observation.focusedField?.label.includes(s[1])),fieldNonempty:!!observation.focusedField?.value,candidates:observation.candidates.length,confidence:Number.isFinite(action.confidence)?action.confidence:null};

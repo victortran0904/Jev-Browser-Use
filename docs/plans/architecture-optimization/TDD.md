@@ -66,3 +66,11 @@ Each RED command exited 1 and its corresponding GREEN exited 0. Raw outputs are 
 Combined local verification: **65 Vitest tests in 13 files**, **22 Node invariant checks**, typecheck, build and six harness assertions passed. Both sets of ten deterministic workflows passed through actual Chromium, extension and relay. After the final GREEN-only array-copy refactor, the canonical suite measured 220 ms focus-click median, 75 ms redirect navigation and 209 ms Back recovery. These are small-fixture measurements, not a universal end-to-end speedup; the isolated Back comparison above uses the same fixture and VPS.
 
 Secret-backed provider and public-flight results belong to the exact-head Oracle VPS Actions job. No public fare or live model pass is inferred from deterministic success. No model credential was fetched out of Actions.
+
+## Provider acceptance follow-through (53–54)
+
+Oracle Actions run 35270540088, head `4825cf2`, passed 65 regression tests, 22 additional checks, build/typecheck and all 20 deterministic journeys. Nine of ten live-provider journeys passed. Gemini then returned HTTP 429 for the last synthetic flight writer and the exact public-flight URL writer; the public task stopped before navigation. These failures remain recorded, not converted to PASS.
+
+53: RED showed a valid `fill_item` traced as invalid; GREEN adds the bounded kind to the trace allowlist without field text disclosure. 54: RED showed verification requests bursting into one slot; GREEN reserves paced request slots synchronously, including concurrent calls. Both used actual failing test exits followed by passing tests; evidence filenames are `53-direct-fill-trace-*` and `54-request-pacing-*`.
+
+The core-provider harness now uses deterministic UI narration rather than spending model calls on acknowledgements/summaries, while retaining the real planner, writer, run controller and browser. Gemini verification requests are spaced at least 4,500 ms; pacing is reported separately from header latency and is not a production browser optimization. No alternate key or quota bypass is used. Strict result assertions and call budgets remain unchanged.
