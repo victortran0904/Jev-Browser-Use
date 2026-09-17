@@ -40,3 +40,9 @@ The user waived subagents. Specification self-review preceded code-quality/safet
 For an existing installation: `npm ci`, reload the bundled Browser Control extension and restart the relay. The popup compatibility patch is pinned to Browser Control 0.7.1 and must be re-reviewed on upgrade.
 
 Model secrets stay in the existing GitHub Actions secret mechanism; no values were printed or extracted. Local Oracle tests did not use them. No temporary runner registration or runner directory remained at the final-continuation check; no new runner was provisioned. Final GitHub checks and any remaining public-site failures are reported in the PR, not hidden behind historical passing results.
+
+## Final acceptance outcome
+
+Runtime head `29d21c9d95d1d8682ec9dc8ffe9aa9b03792e27b` passed the local Oracle gates above and the hosted regression, deterministic and **10/10 live-model fixture** gates in Actions run `35287450407`. The separate public-flight task failed after 6,360 ms: Enter confidence 0.25 was below the unchanged 0.30 threshold. All three TypeSafe and two Gemini requests returned HTTP 200. No actual fare was verified.
+
+A proposed changed-page-only recovery from an uncertain decision was blocked before implementation. Its RED test is archived as `archive/deferred-uncertain-state-recovery.test.ts.txt`; no runtime guard was changed and no failing active test is hidden. Only explanatory documentation/archived inactive tests follow the verified runtime commit. PR #1 remains draft because the public-flight acceptance has not passed. VPS connectivity and Git access are working; this is not a request to reconnect the machine or resend keys.
