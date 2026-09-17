@@ -28,6 +28,8 @@ export interface Observation {
     documentId?: string;
     metrics?: ObservationMetrics;
     pageText?: string;
+    /** Compatibility input alias from the earlier remote collector. */
+    pageContext?: string;
     snapshot: string;
     candidates: Candidate[];
     url: string;
