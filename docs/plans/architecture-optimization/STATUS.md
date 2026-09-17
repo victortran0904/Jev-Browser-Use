@@ -1,3 +1,14 @@
+# Current execution status
+
+The user explicitly authorized direct implementation without subagents for this task on 2026-09-17, retaining TDD and two separate review stages (specification, then code quality). The earlier Codex-runtime blocker below is historical, no longer an implementation gate. Both reviews will be performed by the implementing assistant and reported as self-reviews, not independent agents. No merge is authorized by this adaptation.
+
+Current implementation base: `964b286bcd17020629e795a0df6a2a8d41029e01`.
+Work remains on `perf/browser-architecture-20260917` in the isolated worktree; PR #1 targets main.
+
+The original eight-task plan still defines scope. Preserve public BrowserBoundary and run APIs where practical. Add executable behavior in vertical RED/GREEN cycles, record real test outputs, and run regression/typecheck/build plus real-browser fixture tests. Extend the existing secret-safe Actions harness with the user's exact flight-search prompt. Credentials remain confined to GitHub Actions; no booking, purchase, or payment is permitted in the search test.
+
+## Historical preparation record
+
 # Execution status and baseline
 
 Status: BLOCKED before implementation. This branch currently changes documentation only.
