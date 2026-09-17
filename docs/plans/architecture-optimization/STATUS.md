@@ -8,20 +8,20 @@ The architecture changes include run-owned event-driven popup handling without U
 
 The previously interrupted local-only diagnostics, extra airport-option tests and review notes were reconciled and pushed in the recovery commits through `61e09bc`. The obsolete experimental collector is archived, not active. All original worktrees were clean and matched their intended branches when this final continuation began.
 
-The final writer patch rejects incorrectly typed model decisions instead of coercing strings to booleans, and retries a typed model timeout once on the same model. It never retries browser input and does not retry cancellation. See `COMPLETION-REVIEW.md` for actual RED/GREEN progression and both review stages.
+The final writer patch requests a native JSON output schema, rejects incorrectly typed model decisions instead of coercing strings to booleans, accepts omitted optional explanations, and retries a typed model timeout once on the same model. It never retries browser input and does not retry cancellation. See `COMPLETION-REVIEW.md` for actual RED/GREEN progression and both review stages.
 
 ## Completed Oracle VPS verification
 
 | Gate | Result |
 | --- | --- |
-| Vitest | 105 tests across 27 files passed |
+| Vitest | 108 tests across 27 files passed |
 | Node integration checks | 27 passed |
 | Typecheck and production build | Passed |
 | Credential-free harness assertions | Six passed |
 | Canonical real-extension browser journeys | 10/10 passed |
 | Additional real-extension deterministic journeys | 10/10 passed |
 
-All seven verification commands exited 0 on Oracle `free`. Controlled timings: focus click 152 ms median, redirect navigation 76 ms, Back recovery 134 ms. These are not a paired baseline comparison or a guarantee for arbitrary sites. Raw logs are retained outside source control under `evidence/final-completion/`.
+All seven verification commands exited 0 on Oracle `free`. Controlled timings: focus click 112 ms median, redirect navigation 101 ms, Back recovery 143 ms. These are not a paired baseline comparison or a guarantee for arbitrary sites. Raw logs are retained outside source control under `evidence/final-completion/schema-final/`.
 
 ## Live acceptance and remaining limits
 

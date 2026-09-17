@@ -55,3 +55,34 @@ it.each([true, false])('preserves a properly typed fill=%s response', async fill
   await expect(createWriter().generateText({ goal: 'Search', history: [], observation }))
     .resolves.toEqual({ fill, text: 'Hanoi', reason: 'Origin' });
 });
+
+it('accepts a valid text decision when the optional explanation is omitted', async () => {
+  providerResponse(JSON.stringify({ fill: true, text: 'Hanoi' }));
+  await expect(createWriter().generateText({ goal: 'Search', history: [], observation }))
+    .resolves.toEqual({ fill: true, text: 'Hanoi', reason: '' });
+});
+
+it('accepts a valid URL decision without an optional explanation', async () => {
+  providerResponse(JSON.stringify({ ok: true, url: 'https://example.com' }));
+  await expect(createWriter().generateUrl({ goal: 'Search', history: [] }))
+    .resolves.toBe('https://example.com/');
+});
+
+it('requests typed decisions from the provider for both text and URL generation', async () => {
+  vi.stubEnv('GEMINI_KEY', 'synthetic-test-key');
+  const packets: Array<{ generationConfig: { responseJsonSchema?: unknown } }> = [];
+  vi.stubGlobal('fetch', async (_input: unknown, init: RequestInit) => {
+    packets.push(JSON.parse(String(init.body)));
+    const value = packets.length === 1 ? { fill: true, text: 'Hanoi' } : { ok: true, url: 'https://example.com' };
+    return Response.json({ candidates: [{ content: { parts: [{ text: JSON.stringify(value) }] }, finishReason: 'STOP' }] });
+  });
+  const writer = createWriter();
+  await writer.generateText({ goal: 'Search', history: [], observation });
+  await writer.generateUrl({ goal: 'Search', history: [] });
+  for (const [index, decision, payload] of [[0, 'fill', 'text'], [1, 'ok', 'url']] as const) {
+    expect(packets[index].generationConfig.responseJsonSchema).toMatchObject({
+      type: 'object', properties: { [decision]: { type: 'boolean' }, [payload]: { type: 'string' } },
+      required: [decision, payload], additionalProperties: false,
+    });
+  }
+});

@@ -20,12 +20,18 @@ function validUrl(value: string) {
   } catch { return ""; }
 }
 
-async function json<T>(systemInstruction: string, packet: unknown): Promise<T> {
+async function json<T>(systemInstruction: string, packet: unknown, payload: "url" | "text"): Promise<T> {
+  const decision = payload === "url" ? "ok" : "fill";
+  const responseJsonSchema = {
+    type: "object",
+    properties: { [decision]: { type: "boolean" }, [payload]: { type: "string" }, reason: { type: "string" } },
+    required: [decision, payload], additionalProperties: false,
+  };
   const gemini = client();
   const response = await withGeminiFallback((model) => gemini.models.generateContent({
     model,
     contents: JSON.stringify(packet),
-    config: { maxOutputTokens: 256, temperature: 0.1, responseMimeType: "application/json", systemInstruction },
+    config: { maxOutputTokens: 256, temperature: 0.1, responseMimeType: "application/json", responseJsonSchema, systemInstruction },
   }));
   const raw = response.text?.trim();
   if (!raw) throw new Error("Gemini returned no structured response");
@@ -35,16 +41,17 @@ async function json<T>(systemInstruction: string, packet: unknown): Promise<T> {
 export function createWriter(): Writer {
   return {
     async generateUrl(input) {
-      const answer = await json<{ ok: boolean; url: string; reason: string }>(
+      const answer = await json<{ ok: boolean; url: string; reason?: string }>(
         "Given a browser goal, return JSON with ok, url, reason. Choose the single best HTTPS URL to open first. Prefer the site's homepage or direct public page. Never invent credentials or private URLs.",
         { goal: input.goal, previous_actions: input.history.slice(-8) },
+        "url",
       );
-      if (!answer || typeof answer.ok !== "boolean" || typeof answer.url !== "string" || typeof answer.reason !== "string")
+      if (!answer || typeof answer.ok !== "boolean" || typeof answer.url !== "string")
         throw new Error("Gemini returned invalid structured URL response");
       return answer.ok ? validUrl(answer.url.trim()) : "";
     },
     async generateText(input) {
-      const answer = await json<{ fill: boolean; text: string; reason: string }>(
+      const answer = await json<{ fill: boolean; text: string; reason?: string }>(
         "Return JSON with fill, text, reason for exactly one focused browser text field. Use the goal, field metadata, recent actions, and page text. Never invent passwords, credentials, payment data, or personal information; set fill=false for those fields.",
         {
           goal: input.goal,
@@ -53,10 +60,11 @@ export function createWriter(): Writer {
           focused_field: input.observation.focusedField,
           page_text: (input.observation.pageText ?? input.observation.snapshot).slice(0, 12_000),
         },
+        "text",
       );
-      if (!answer || typeof answer.fill !== "boolean" || typeof answer.text !== "string" || typeof answer.reason !== "string")
+      if (!answer || typeof answer.fill !== "boolean" || typeof answer.text !== "string")
         throw new Error("Gemini returned invalid structured text response");
-      return { fill: answer.fill, text: answer.text.trim(), reason: answer.reason };
+      return { fill: answer.fill, text: answer.text.trim(), reason: typeof answer.reason === "string" ? answer.reason : "" };
     },
   };
 }

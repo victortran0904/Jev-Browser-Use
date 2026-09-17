@@ -48,3 +48,21 @@ All seven verification commands completed with exit 0 on `free` after the applie
 Controlled fixture timings were **152 ms focus-click median**, **76 ms redirect navigation**, and **134 ms Back recovery**. These are not paired before/after comparisons or universal website latency claims. Raw results remain in `evidence/final-completion/`. No model secrets were used in these Oracle checks.
 
 The hosted secret-backed run for the final pushed head is recorded in PR #1 after execution. Its outcome must not be inferred from the local suite. No temporary self-hosted runner was provisioned during this continuation; earlier provisioning restrictions were not bypassed. No runner registration or temporary runner directory remained when checked.
+
+## Follow-through: optional explanations and provider output schema
+
+The exact-head hosted run at `501cc43` completed with artifacts. Regression/build/invariants and deterministic journeys passed. Live fixtures passed 7/10: two writer-stage runtime failures and one low-confidence stop; the public flight attempt stopped at confidence 0.28. These failures remain recorded in run `35286464623`. Raw provider bodies were not logged, so missing explanations are not asserted to explain every live failure.
+
+Code review found the new runtime validation unnecessarily required the optional `reason` explanation. Two additional public-writer tests reproduced rejection of valid text and URL decisions with that field omitted. Minimal fixes keep decision booleans and payload strings strict while defaulting a missing explanation to empty text. Each test was observed RED then GREEN (`optional-reason-*` and `optional-url-reason-*`).
+
+A third RED/GREEN test verifies the actual provider HTTP contract for both writer methods: the SDK now sends `responseJsonSchema` with a boolean decision, string payload and optional explanation. Runtime validation remains as a separate safeguard. This uses the existing installed Google SDK, adds no dependency and does not change model selection, generation limits or browser actions. Evidence: `provider-schema-RED.txt` and `provider-schema-GREEN.txt`.
+
+### Follow-through stage 1 — specification review
+
+Reviewed the exact writer/test diff against the existing public contract. Missing optional explanations no longer invalidate otherwise usable decisions. Malformed decision flags still cannot become permission through truthiness coercion. Native output schemas request the intended structure from the provider rather than relying solely on a prose instruction. The exact flight prompt, acceptance checks, 12 decisions, two pre-dispatch refreshes, confidence threshold and provider budgets remain unchanged. Specification self-review accepts these compatibility and output-format corrections.
+
+### Follow-through stage 2 — code-quality and safety review
+
+After the specification pass, reviewed schema construction, SDK request serialization, default handling and preserved negative tests. The schema fields are static internal choices, not page-controlled data. Both methods keep their existing API. Explanations remain optional in the TypeScript type and external schema. No raw error/response content is added to logs; only synthetic credentials are used by tests. The output schema is not treated as proof of semantic correctness, and action-time browser validation remains mandatory. The only GREEN refactor tightens the HTTP packet test's type instead of using `any`. Quality self-review accepts the patch, pending fresh complete-suite and exact-head acceptance results. Neither pass is independent-agent or Greptile approval.
+
+The corrected implementation passed all seven local verification commands on Oracle `free`: **108 Vitest tests in 27 files**, **27 Node checks**, typecheck, build, six harness assertions, and both ten-journey real-extension suites. Evidence is under `evidence/final-completion/schema-final/`. Small-fixture results: **112 ms focus-click median**, **101 ms redirect navigation**, **143 ms Back recovery**. No assertion or confidence threshold was relaxed. These local results do not predeclare a new hosted live/public-flight pass.
