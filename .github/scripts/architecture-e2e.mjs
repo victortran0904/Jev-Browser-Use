@@ -12,6 +12,7 @@ import {createBrowserBoundary} from '../../server/browser.ts';
 import {createRunController} from '../../server/runs.ts';
 import {createPlanner} from '../../server/planner.ts';
 import {createWriter} from '../../server/writer.ts';
+import {createRequestGate} from '../../integration/request-pacing.mjs';
 import {traceStep,failureCategory} from '../../integration/trace.mjs';
 import {fixtureResponse,journeys,exercise} from '../../integration/journeys.mjs';
 import {runPublicFlight, flightPrompt} from './public-flight.mjs';
@@ -21,14 +22,18 @@ const report={schemaVersion:1,mode,runner:process.env.RUNNER_NAME||"oracle-free-
 const counts={typesafe:0,gemini:0};
 const classify=failureCategory;
 const originalFetch=globalThis.fetch;
+const geminiGate=createRequestGate({spacingMs:4500});
+report.verificationPolicy={geminiMinSpacingMs:4500,narration:"deterministic test messages; real planner and writer"};
 globalThis.fetch=async(input,init)=>{
   const url=new URL(typeof input==='string'||input instanceof URL?input:input.url);
   const provider=url.hostname==='api.typesafe.ai'?'typesafe':url.hostname==='generativelanguage.googleapis.com'?'gemini':null;
   if(!provider) {assert(['127.0.0.1','localhost'].includes(url.hostname),'Unexpected model request host');return originalFetch(input,init);}
   assert.equal(url.protocol,'https:');
-  if(++counts[provider]>(provider==='typesafe'?140:80)) throw new Error('Request budget exceeded');
+  const requestNumber=++counts[provider];
+  if(requestNumber>(provider==='typesafe'?140:80)) throw new Error('Request budget exceeded');
+  const pacingMs=provider==='gemini'?await geminiGate():0;
   const started=performance.now();
-  const record={provider,number:counts[provider]}; report.requests.push(record);
+  const record={provider,number:requestNumber,pacingMs}; report.requests.push(record);
   const prior=init?.signal||(input instanceof Request?input.signal:undefined);
   const signal=prior?AbortSignal.any([prior,AbortSignal.timeout(30000)]):AbortSignal.timeout(30000);
   try {
@@ -94,7 +99,7 @@ try {
   const makePlanner=()=>createPlanner(new TypeSafeClient({timeout:25000,retry:{maxRetries:1,backoffInitialMs:500,backoffMaxMs:1000,maxRetryAfterMs:2000},logger}));
   async function liveRun(scenario) {
     const trace=[];const realPlanner=makePlanner();
-    const controller=createRunController({browser:boundary,planner:{plan:async input=>{const action=await realPlanner.plan(input);trace.push(traceStep(action,input.observation,scenario.steps));return action;}},writer:createWriter(),enableScreenshots:false});
+    const controller=createRunController({browser:boundary,planner:{plan:async input=>{const action=await realPlanner.plan(input);trace.push(traceStep(action,input.observation,scenario.steps));return action;}},writer:createWriter(),narrator:{acknowledge:async()=>"Starting controlled browser test.",summarize:async()=>"Controlled browser test finished."},enableScreenshots:false});
     const goal=`Open ${scenario.url}. ${scenario.goal} Stop only when the requested result is visibly complete.`;
     const run=controller.start({goal});controllers.push([controller,run]);
     await controller.settled(run.id);
