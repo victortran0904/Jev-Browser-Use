@@ -79,7 +79,8 @@ try {
   const base=`https://127.0.0.1:${server.address().port}`;
   relayProcess=spawn(process.execPath,[path.resolve('node_modules/@opencode-ai/browser-control/dist/cli.js'),'serve'],{env:childEnv,stdio:'ignore'});
   const extension=path.resolve('node_modules/@opencode-ai/browser-control/extension/dist');
-  browserProcess=spawn(chromium.executablePath(),[`--user-data-dir=${path.join(temp,'profile')}`,`--disable-extensions-except=${extension}`,`--load-extension=${extension}`,'--no-first-run','--no-default-browser-check','--no-sandbox','--disable-dev-shm-usage','--ignore-certificate-errors','--disable-background-networking','about:blank'],{env:childEnv,stdio:'ignore'});
+  // The disposable CI browser permits popup behavior, as Playwright normally does.
+  browserProcess=spawn(chromium.executablePath(),[`--user-data-dir=${path.join(temp,'profile')}`,`--disable-extensions-except=${extension}`,`--load-extension=${extension}`,'--no-first-run','--no-default-browser-check','--no-sandbox','--disable-dev-shm-usage','--ignore-certificate-errors','--disable-background-networking','--disable-popup-blocking','about:blank'],{env:childEnv,stdio:'ignore'});
   relayProcess.on('error',()=>{});browserProcess.on('error',()=>{});
   let ready=false;const deadline=performance.now()+45000;
   while(performance.now()<deadline){
