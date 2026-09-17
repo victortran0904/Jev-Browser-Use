@@ -1,6 +1,7 @@
 import { choice, TypeSafeClient } from "@typesafe-ai/sdk";
 import { SITES } from "./sites.js";
 import { modelPage } from "./model-context.js";
+import { availableActions } from "./action-availability.js";
 import type { Observation, PlannedAction } from "./types.js";
 
 type ChoiceAnswer = { type: "choice"; choice: string; confidence: number; probabilities: Record<string, number> };
@@ -43,7 +44,7 @@ export function createPlanner(client?: JevLike): { plan(input: PlanInput): Promi
             previous_action_results: input.history.slice(-8),
           },
           questions: {
-            kind: choice("Which single action kind makes the most progress toward the goal right now?", kindCriteria(input.observation)),
+            kind: choice("Which single action kind makes the most progress toward the goal right now?", availableActions(kindCriteria(input.observation), input.observation)),
             site: choice("If a website must be opened now, which catalog entry applies?", siteCriteria),
             item: choice("If clicking an on-screen item is the right action, which current item should be activated?", itemCriteria),
           },
