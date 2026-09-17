@@ -1,26 +1,17 @@
 name: Architecture E2E
-
 on:
   push:
     branches: [perf/browser-architecture-20260917]
-    paths:
-      - 'server/**'
-      - 'tests/**'
-      - 'integration/**'
-      - '.github/scripts/architecture-e2e.mjs'
-      - '.github/workflows/architecture-e2e.yml'
+    paths: ['server/**', 'tests/**', 'integration/**', '.github/scripts/architecture-e2e.mjs', '.github/workflows/architecture-e2e.yml']
   workflow_dispatch:
-
 permissions:
   contents: read
-
 concurrency:
   group: architecture-e2e-${{ github.ref }}
   cancel-in-progress: false
-
 jobs:
   regression:
-    if: github.repository == 'victortran0904/Jev-Browser-Use' && github.ref == 'refs/heads/perf/browser-architecture-20260917'
+    if: github.repository == 'victortran0904/Jev-Browser-Use' && github.ref == 'refs/heads/perf/browser-architecture-20260917' && (github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[verify]'))
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
@@ -37,7 +28,6 @@ jobs:
       - run: node node_modules/playwright-core/cli.js install --with-deps --no-shell chromium
       - name: Real-browser invariant regressions
         run: node --import tsx --test integration/*.checks.mjs
-
   journeys:
     needs: regression
     if: github.repository == 'victortran0904/Jev-Browser-Use' && github.ref == 'refs/heads/perf/browser-architecture-20260917'
