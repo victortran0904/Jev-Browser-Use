@@ -32,6 +32,14 @@ export function parseSnapshot(snapshot: string): Candidate[] {
   return candidates;
 }
 
+/** Only emitted when our guard proves no browser input was dispatched. */
+export class StaleObservationError extends Error {
+  constructor() {
+    super("Stale browser document or focus; observe again before acting");
+    this.name = "StaleObservationError";
+  }
+}
+
 export function validateAction(action: PlannedAction, observation: Observation): PlannedAction {
   if (action.observationId !== observation.id) throw new Error("Stale observation: refresh before acting");
   if (!actionKinds.has(action.kind)) throw new Error("Unsupported browser action");
@@ -190,11 +198,14 @@ export function createBrowserBoundary(
           if (!observer || jevSession.active !== page) throw new Error("Document changed");
           await observer.evaluate((value, input) => value.verifyDocument(input.id, input.url), ${JSON.stringify({ id: observation.documentId, url: observation.url })});
           ${action.kind === "press_enter" && observation.focusedField ? `await observer.evaluate((value, id) => { value.resolveFocus(id); return true; }, ${JSON.stringify(observation.documentId)});` : ""}
-        } catch { throw new Error("Stale browser document or focus; observe again"); }
+        } catch { return { status: "stale-before-input" }; }
       ` : "";
       const activate = options.activateTargetBeforeAction === false ? "" : "await page.bringToFront();\n";
-      const result = await withBrowserInput(command, async () => String(await execute(`jev-${runId}`, documentGuard + activate + script)));
-      return result;
+      const result = await withBrowserInput(command, () => execute(`jev-${runId}`, documentGuard + activate + script));
+      if (result && typeof result === "object" && (result as { status?: unknown }).status === "stale-before-input") {
+        throw new StaleObservationError();
+      }
+      return String(result);
     },
     async close(runId) {
       const session = `jev-${runId}`;

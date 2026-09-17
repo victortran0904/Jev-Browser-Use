@@ -32,7 +32,9 @@ export function createPlanner(client?: JevLike): { plan(input: PlanInput): Promi
     async plan(input) {
       let consecutiveWaits = 0;
       for (let i = input.history.length - 1; i >= 0 && input.history[i] === "waited"; i--) consecutiveWaits += 1;
-      const itemCriteria: Record<string, string> = Object.fromEntries(input.observation.candidates.map((item) => [item.ref, item.label + (item.field ? ` [editable=${item.field.isText}, value=${JSON.stringify(item.field.value.slice(0, 120))}]` : "")]));
+      // Questions are evaluated independently. Put semantics in shared state,
+      // and keep item criteria as references instead of repeating the controls.
+      const itemCriteria: Record<string, string | null> = Object.fromEntries(input.observation.candidates.map((item) => [item.ref, null]));
       if (Object.keys(itemCriteria).length < 2) Object.assign(itemCriteria, { no_item: "No on-screen item applies", unavailable: "No second item is available" });
       const siteCriteria = {
         ...Object.fromEntries(Object.entries(SITES).map(([name, url]) => [name, `${name.replaceAll("_", " ")} (${url})`])),
@@ -52,7 +54,7 @@ export function createPlanner(client?: JevLike): { plan(input: PlanInput): Promi
           questions: {
             kind: choice("Which single action kind makes the most progress toward the goal right now?", availableActions(kindCriteria(input.observation), input.observation)),
             site: choice("If a website must be opened now, which catalog entry applies?", siteCriteria),
-            item: choice("If clicking or filling an on-screen item is the right action, which current item should be used?", itemCriteria),
+            item: choice("If clicking or filling is appropriate, which ref from page.controls should be used?", itemCriteria),
           },
         });
       } catch (error) {
