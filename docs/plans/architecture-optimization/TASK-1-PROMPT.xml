@@ -1,0 +1,29 @@
+<fresh_task_prompt>
+<task>
+Implement Task 1: Safe transport and phase-level timing.
+This changes executable behavior and fixes unsafe mutation replay; TDD is mandatory.
+Work only on branch perf/browser-architecture-20260917 in its isolated worktree.
+
+Keep BrowserBoundary's public begin/observe/open/act/close API and existing run-controller/SSE consumers compatible. The existing transport catches HTTP errors/timeouts, returns null, then blindly retries the same browser command through CLI. A lost response is not proof that a mutating action did not execute. Fix this without widening browser privileges or silently changing the pinned relay protocol.
+
+First tracer bullet: through BrowserBoundary.act, reproduce a relay action that executes but loses its response; assert that the external page-side effect happens once and the caller receives an explicit outcome-unknown failure rather than the command being replayed. Mock only the external relay/CLI boundary or use a local protocol-compatible fixture.
+
+After that behavior is GREEN, add one behavior at a time for proven pre-dispatch unavailability, explicit relay rejection, malformed responses, conservative bootstrap/fallback, and preserved relay diagnostics. Do not assume request IDs provide deduplication. Inspect installed Browser Control wire schemas first.
+
+Then expose timing through public observation/run events: transport and renderer extraction separately, writer separate from browser action, screenshot/navigation/popup subphases where measurable. Use monotonic timing, mark unavailable measurements explicitly, avoid double-counting overlapping spans, and never log sensitive input content. Keep changes scoped; do not implement later plan tasks yet.
+</task>
+<before_you_begin>
+Read skills/sdd/SKILL.md and skills/tdd/SKILL.md plus linked TDD references. Verify clean git status and record HEAD. No external MCP tools or credentials should be assumed. Report BLOCKED/NEEDS_CONTEXT for a real missing dependency rather than inventing results.
+</before_you_begin>
+<your_job>
+For every behavior: name the public interface under test, add one failing behavior test, run it and save real RED evidence, implement the minimal change, run it to GREEN, and repeat. No bulk test-first pass. Refactor only while GREEN. Keep raw command/exit/output evidence outside source control until summarized with secrets removed.
+Run focused tests, npm test, npm run typecheck, npm run build; self-review and commit on this branch only. Do not push or merge; the controller reviews specification compliance then code quality before publishing accepted changes.
+</your_job>
+<code_organization>
+Prefer small public interfaces with deep implementations. Extract transport from server/browser.ts only when justified by the current tracer bullet. Do not touch skills, unrelated UI, dependencies without justification, or other worktrees.
+</code_organization>
+<report_format>
+Within the first five stdout lines emit exactly one matching line: Status: DONE, Status: DONE_WITH_CONCERNS, Status: NEEDS_CONTEXT, or Status: BLOCKED.
+Then report behavior changes, files, commit SHA, actual RED/GREEN progression, verification commands/outcomes, self-review findings and limitations. Never claim a test or independent review ran unless it actually did.
+</report_format>
+</fresh_task_prompt>
