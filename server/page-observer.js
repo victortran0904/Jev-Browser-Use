@@ -1,5 +1,5 @@
-// Evaluated inside a document via evaluateHandle, not on window. The registry
-// lives in this closure and never trusts page-authored reference attributes.
+// Evaluated inside a document via evaluateHandle. No reference registry is
+// attached to window and page-authored data attributes are never trusted.
 (() => {
   const documentId = `${Date.now()}-${Math.random()}`;
   const refs = new WeakMap();
@@ -91,7 +91,7 @@
     if (request.documentId!==documentId) throw new Error('Stale observation: document changed');
     const entry=entries.get(request.ref);
     if (!entry || !entry.el.isConnected || entry.signature!==request.signature || identity(entry.el)!==entry.signature || !visible(entry.el)) throw new Error('Stale observation: target changed');
-    if (request.text && (!isText(entry.el) || (request.focused && document.activeElement!==entry.el))) throw new Error('Stale observation: focused field changed or sensitive');
+    if ((request.text && !isText(entry.el)) || (request.focused && document.activeElement!==entry.el)) throw new Error('Stale observation: focused field changed or sensitive');
     return entry.el;
   }
   function release() {
@@ -100,5 +100,6 @@
     document.fonts?.removeEventListener('loadingdone',invalidate);
     entries.clear(); cached=null;
   }
-  return {capture,resolve,release};
+  function assertDocument(expected) { if(expected!==documentId) throw new Error('Stale observation: document changed'); }
+  return {capture,resolve,release,assertDocument};
 })()
