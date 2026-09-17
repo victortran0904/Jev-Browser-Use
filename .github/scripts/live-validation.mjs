@@ -20,7 +20,7 @@ const report = {
   schemaVersion: 1,
   commit: /^[a-f0-9]{40}$/.test(process.env.GITHUB_SHA || "") ? process.env.GITHUB_SHA : "local",
   scope: "Unmodified application baseline; live API + real extension/local fixture; not an optimized-build comparison",
-  tests: [], requests: [],
+  tests: [], requests: [], browserTrace: [],
 };
 const safeName = (value) => /^[a-zA-Z0-9._/-]{1,100}$/.test(value || "") ? value : "unavailable";
 function classify(error) {
@@ -85,7 +85,7 @@ globalThis.fetch = async (input, init) => {
     return originalFetch(input, init);
   }
   assert.equal(url.protocol, "https:");
-  if (++counts[provider] > (provider === "typesafe" ? 8 : 10)) throw new Error("Request budget exceeded");
+  if (++counts[provider] > (provider === "typesafe" ? 12 : 10)) throw new Error("Request budget exceeded");
   const started = performance.now();
   const record = { provider, number: counts[provider], model: safeName(url.pathname.match(/\/models\/([^:]+):/)?.[1] || (provider === "typesafe" ? "jev-latest" : "catalog")) };
   report.requests.push(record);
@@ -102,7 +102,7 @@ globalThis.fetch = async (input, init) => {
   }
 };
 
-// Never pass the model credentials to Chrome, the extension, openssl or the relay.
+// Explicitly spawned Chrome, openssl and relay processes receive no model credentials.
 const childEnv = Object.fromEntries(Object.entries(process.env).filter(([key]) =>
   ["PATH", "HOME", "DISPLAY", "XAUTHORITY", "TMPDIR", "LANG", "LD_LIBRARY_PATH"].includes(key)));
 let browserProcess, relayProcess, fixtureServer, temp, activeController, activeRun;
@@ -138,7 +138,7 @@ try {
   let planner, writer;
   if (keysPresent) {
     const logger = { debug() {}, info() {}, warn() {}, error() {} };
-    planner = createPlanner(new TypeSafeClient({ timeout: 25_000, retry: { maxRetries: 0 }, logger }));
+    planner = createPlanner(new TypeSafeClient({ timeout: 25_000, retry: { maxRetries: 2, backoffInitialMs: 500, backoffMaxMs: 1500, maxRetryAfterMs: 2000 }, logger }));
     writer = createWriter();
   }
   const catalogOk = keysPresent && await check("gemini-key-and-model-catalog", async () => {
@@ -219,34 +219,44 @@ try {
     }
     throw new Error("Extension startup timeout");
   });
-  if (browserReady) await check("real-browser-navigation-observation-and-actions", async () => {
+  const browserOk = browserReady && await check("real-browser-navigation-observation-and-actions", async () => {
     const boundary = createBrowserBoundary();
     const id = "ci-deterministic";
     const timings = {};
+    const trace = (stage, details = {}) => report.browserTrace.push({ stage, ...details });
     try {
-      await boundary.begin(id);
-      let start = performance.now(); await boundary.open(id, fixtureUrl); timings.navigationMs = Math.round(performance.now() - start);
+      await boundary.begin(id); trace("session-created");
+      let start = performance.now(); await boundary.open(id, fixtureUrl); timings.navigationMs = Math.round(performance.now() - start); trace("navigation-returned");
       const durations = [];
       let observed;
       for (let i = 0; i < 10; i++) {
         start = performance.now(); observed = await boundary.observe(id); durations.push(performance.now() - start);
+        trace("observed", { sample: i, titleMatched: observed.title === "Local search fixture", candidates: observed.candidates.length, localOriginMatched: new URL(observed.url).origin === new URL(fixtureUrl).origin });
         assert.equal(observed.title, "Local search fixture"); assert.equal(observed.candidates.length, 2);
       }
       durations.sort((a, b) => a - b);
       timings.observationMedianMs = Math.round((durations[4] + durations[5]) / 2);
       timings.observationP95Ms = Math.round(durations[9]);
-      const target = observed.candidates.find(item => item.label.includes("Search query")); assert(target);
-      start = performance.now(); await boundary.act(id, { kind: "click_item", target: target.ref, observationId: observed.id }, observed); timings.focusClickMs = Math.round(performance.now() - start);
-      observed = await boundary.observe(id); assert.equal(observed.focusedField?.isText, true);
+      const target = observed.candidates.find(item => item.label.includes("Search query")); trace("target-selected", { found: Boolean(target) }); assert(target);
+      start = performance.now(); await boundary.act(id, { kind: "click_item", target: target.ref, observationId: observed.id }, observed); timings.focusClickMs = Math.round(performance.now() - start); trace("click-returned", { durationMs: timings.focusClickMs });
+      observed = await boundary.observe(id); trace("focus-verified", { isText: observed.focusedField?.isText === true }); assert.equal(observed.focusedField?.isText, true);
       await boundary.act(id, { kind: "type_text", value: "architecture smoke", observationId: observed.id }, observed);
-      observed = await boundary.observe(id); assert.equal(observed.focusedField?.value, "architecture smoke");
+      observed = await boundary.observe(id); trace("fill-verified", { exactTextMatched: observed.focusedField?.value === "architecture smoke" }); assert.equal(observed.focusedField?.value, "architecture smoke");
       await boundary.act(id, { kind: "press_enter", observationId: observed.id }, observed);
-      observed = await boundary.observe(id); assert(observed.snapshot.includes("Search complete: architecture smoke"));
+      // Keyboard completion is not a guarantee that the resulting document is loaded.
+      const readinessDeadline = Date.now() + 5000;
+      do {
+        observed = await boundary.observe(id);
+        if (observed.snapshot.includes("Search complete: architecture smoke")) break;
+        await pause(100);
+      } while (Date.now() < readinessDeadline);
+      trace("submission-verified", { successVisible: observed.snapshot.includes("Search complete: architecture smoke"), exactSubmissionReceived: searches.length > 0 });
+      assert(observed.snapshot.includes("Search complete: architecture smoke"));
       assert(searches.length > 0);
       return { ...timings, observationSamples: 10, exactSearchSubmitted: true, transport: "real-browser-control-relay-and-extension" };
     } finally { await boundary.close(id); }
   });
-  if (browserReady && typesafeOk && geminiOk) await check("live-agent-end-to-end-local-search", async () => {
+  if (browserOk && typesafeOk && geminiOk) await check("live-agent-end-to-end-local-search", async () => {
     const boundary = createBrowserBoundary();
     const countBefore = searches.length;
     let planCount = 0, writerCount = 0;
