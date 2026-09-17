@@ -1,5 +1,8 @@
 /** Runs entirely inside the page. Keep this function self-contained for serialization. */
 export function collectObservation() {
+  const started = performance.now();
+  let elementsInspected = 0;
+  let accepted = 0;
 
             const isSensitive = (el: Element) => {
               const metadata = ["type", "autocomplete", "name", "id", "aria-label"].map(name => el.getAttribute(name) || "").join(" ").toLowerCase();
@@ -9,12 +12,15 @@ export function collectObservation() {
             const registry = host.__jevRefs ?? (host.__jevRefs = { ids: new WeakMap(), next: 0, nodes: new Map(), documentId: Array.from(crypto.getRandomValues(new Uint32Array(4))).join("-") });
             const selector = "a,button,input,textarea,select,[role=button],[role=link],[role=textbox],[role=searchbox],[contenteditable=true]";
             const elements = Array.from(document.querySelectorAll<HTMLElement>(selector)).filter((el) => {
-              if (!(el instanceof HTMLElement)) return false;
+              if (accepted >= 180 || !(el instanceof HTMLElement)) return false;
+              elementsInspected++;
               const rect = el.getBoundingClientRect();
               const style = getComputedStyle(el);
               if (el.tagName.toLowerCase() === "a" && (el.getAttribute("href") || "").startsWith("#")) return false;
               const name = el.getAttribute("aria-label") || el.getAttribute("placeholder") || el.getAttribute("title") || el.getAttribute("alt") || (el instanceof HTMLInputElement && !isSensitive(el) ? el.value : "") || el.innerText || el.textContent || "";
-              return Boolean(String(name).trim()) && rect.width > 0 && rect.height > 0 && rect.right >= 0 && rect.left <= innerWidth && rect.bottom >= 0 && rect.top <= innerHeight && style.visibility !== "hidden" && style.display !== "none";
+              const visible = Boolean(String(name).trim()) && rect.width > 0 && rect.height > 0 && rect.right >= 0 && rect.left <= innerWidth && rect.bottom >= 0 && rect.top <= innerHeight && style.visibility !== "hidden" && style.display !== "none";
+              if (visible) accepted++;
+              return visible;
             }).slice(0, 180);
             registry.nodes = new Map();
             const candidates = elements.map((el, index) => {
@@ -35,7 +41,7 @@ export function collectObservation() {
               const isText = !isSensitive(el) && (tag === "textarea" || (tag === "input" && !["button", "submit", "checkbox", "radio", "file", "hidden"].includes((el.getAttribute("type") || "text").toLowerCase())) || role === "textbox" || role === "searchbox" || el.isContentEditable);
               focusedField = { label: el.getAttribute("aria-label") || el.getAttribute("name") || el.getAttribute("id") || "", placeholder: el.getAttribute("placeholder") || "", value: isSensitive(el) ? "" : "value" in el ? String((el as HTMLInputElement).value || "").slice(0, 300) : String(el.textContent || "").slice(0, 300), isText };
             }
-            return { documentId: registry.documentId, candidates, focusedField, pageText: String(document.body?.innerText || "").replace(/\n{3,}/g, "\n\n").slice(0, 12000) };
+            return { documentId: registry.documentId, metrics: { elementsInspected, domExtractMs: performance.now() - started }, candidates, focusedField, pageText: String(document.body?.innerText || "").replace(/\n{3,}/g, "\n\n").slice(0, 12000) };
 }
 
 // tsx may emit a harmless __name helper; supply it inside the page, not from Node.

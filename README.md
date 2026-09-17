@@ -86,3 +86,15 @@ synthetic and do not establish real flight prices.
 
 Repository credentials are used only in the dedicated GitHub Actions live step.
 No keys are read back to a workstation or included in test artifacts.
+
+### Owned-popup compatibility
+
+This app pins Browser Control to **0.7.1**. `npm ci` runs the local
+`scripts/browser-control-compat.mjs` compatibility patch, verified against exact
+before/after SHA-256 checksums. It attaches newly created tabs only when Chrome
+identifies their opener as a relay-owned Jev session; unrelated/user-owned tabs
+are not attached. The original package license remains in `node_modules`.
+A dependency upgrade requires reviewing and updating the patch; unknown versions
+or modified dependency files fail installation rather than accepting a partial
+patch. After updating an existing local install, restart its Browser Control
+relay and reload the unpacked extension before testing popup workflows.

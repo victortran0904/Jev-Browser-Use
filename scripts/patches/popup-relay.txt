@@ -1,0 +1,17 @@
+    // Jev popup ownership compatibility for browser-control 0.7.1.
+    if (extensionMethod === "tabs.created") {
+      const tabId = message.params?.tabId;
+      const openerTabId = message.params?.openerTabId;
+      const opener = registry.tabTargets.get(openerTabId);
+      const ownerId = opener?.browserControlSessionId;
+      if (!Number.isInteger(tabId) || !Number.isInteger(openerTabId)
+        || registry.tabTargets.has(tabId) || opener?.owner !== "relay"
+        || typeof ownerId !== "string" || !ownerId.startsWith("jev-")) return;
+      void Effect17.runPromise(Effect17.gen(function* () {
+        if (!extensionRpc.isCurrent(socket) || generation !== extensionGeneration
+          || registry.tabTargets.get(openerTabId) !== opener) return;
+        yield* rootLifecycle.attach({ tabId, owner: "relay", browserControlSessionId: ownerId,
+          expectedExtensionGeneration: generation });
+      })).catch(() => { console.warn("[jev] Owned popup attachment failed"); });
+      return;
+    }

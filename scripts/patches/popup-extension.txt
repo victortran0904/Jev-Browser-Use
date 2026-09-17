@@ -1,0 +1,8 @@
+
+// Jev popup ownership compatibility for browser-control 0.7.1.
+// Only tab IDs are sent; the authenticated relay validates opener ownership.
+chrome.tabs.onCreated.addListener(tab => {
+  if (Number.isInteger(tab.id) && Number.isInteger(tab.openerTabId) && openSocket()) {
+    sendMessage({ method: "tabs.created", params: { tabId: tab.id, openerTabId: tab.openerTabId } });
+  }
+});

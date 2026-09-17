@@ -138,11 +138,11 @@ export function createBrowserBoundary(
       await targets.discover(root);
       let raw = await execute(root, observeScript);
       if (await targets.discover(root)) raw = await execute(root, observeScript);
-      const value = raw as { documentId?: string; candidates?: Candidate[]; pageText?: string; focusedField?: FocusedField | null; url?: string; title?: string };
+      const value = raw as { metrics?: Observation["metrics"]; documentId?: string; candidates?: Candidate[]; pageText?: string; focusedField?: FocusedField | null; url?: string; title?: string };
       const candidates = value.candidates ?? [];
       const snapshot = `${candidates.map((item) => `${item.label} [ref=${item.ref}]`).join("\n")}\n\nVisible page text:\n${value.pageText ?? ""}`.slice(0, 30_000);
       return {
-        id: randomUUID(), documentId: value.documentId, snapshot, candidates,
+        id: randomUUID(), documentId: value.documentId, metrics: value.metrics, snapshot, candidates,
         url: String(value?.url ?? ""), title: String(value?.title ?? ""),
         ...(value.focusedField ? { focusedField: value.focusedField } : {}),
         ...(screenshotPath ? { screenshotUrl: `/api/runs/${runId}/screenshot` } : {}),

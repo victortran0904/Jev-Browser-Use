@@ -11,11 +11,12 @@
     "browser:doctor": "browser-control doctor",
     "browser:extension-path": "node -e \"console.log(require('path').resolve('node_modules/@opencode-ai/browser-control/extension/dist'))\"",
     "test:e2e": "node --import tsx e2e/browsing.mjs",
-    "test:e2e:relay": "node --import tsx e2e/browsing.mjs --relay"
+    "test:e2e:relay": "node --import tsx e2e/browsing.mjs --relay",
+    "postinstall": "node scripts/browser-control-compat.mjs"
   },
   "dependencies": {
     "@google/genai": "2.23.0",
-    "@opencode-ai/browser-control": "^0.7.1",
+    "@opencode-ai/browser-control": "0.7.1",
     "@tailwindcss/vite": "4.3.3",
     "@typesafe-ai/sdk": "^0.6.0",
     "border-beam": "1.3.0",

@@ -1,0 +1,10 @@
+{
+  "dist/cli.js": {
+    "original": "466ed61f0fe9e865a8b5544d54ca184d95457808b7e687763e948585860a6aee",
+    "patched": "6a125a9c5592db3117b384ab0d4742f4d108a1beb0a56026b922740f178cfdf1"
+  },
+  "extension/dist/background.js": {
+    "original": "ccd123194f70a0e3aa7f5752f8ca18c32832acd25a868a95bd95a1bf50073e2c",
+    "patched": "62026e0cda0283e0a8cacf42760fad8ab91bca869ec1b6986bb1316f5a2ca43b"
+  }
+}
