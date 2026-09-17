@@ -39,6 +39,8 @@ export function createWriter(): Writer {
         "Given a browser goal, return JSON with ok, url, reason. Choose the single best HTTPS URL to open first. Prefer the site's homepage or direct public page. Never invent credentials or private URLs.",
         { goal: input.goal, previous_actions: input.history.slice(-8) },
       );
+      if (!answer || typeof answer.ok !== "boolean" || typeof answer.url !== "string" || typeof answer.reason !== "string")
+        throw new Error("Gemini returned invalid structured URL response");
       return answer.ok ? validUrl(answer.url.trim()) : "";
     },
     async generateText(input) {
@@ -52,7 +54,9 @@ export function createWriter(): Writer {
           page_text: (input.observation.pageText ?? input.observation.snapshot).slice(0, 12_000),
         },
       );
-      return { fill: Boolean(answer.fill), text: String(answer.text ?? "").trim(), reason: String(answer.reason ?? "") };
+      if (!answer || typeof answer.fill !== "boolean" || typeof answer.text !== "string" || typeof answer.reason !== "string")
+        throw new Error("Gemini returned invalid structured text response");
+      return { fill: answer.fill, text: answer.text.trim(), reason: answer.reason };
     },
   };
 }
