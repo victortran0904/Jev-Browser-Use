@@ -5,13 +5,17 @@ export function focusedFillScript(documentId: string | undefined, text: string, 
     const input = ${input};
     const observer = jevSession.observers?.get(page);
     if (!observer) throw new Error("Stale document; observe again");
-    const handle = await observer.evaluateHandle(
+    // Only resolution is recoverable: fill and disposal failures stay terminal.
+    let handle;
+    try {
+      handle = await observer.evaluateHandle(
       (value, input) => {
         const element = value.resolveFocus(input.documentId);
         const current = "value" in element ? String(element.value) : element.textContent || "";
         return current === input.text ? null : element;
       }, input
     );
+    } catch { return { _jevOutcome: "stale-observation", dispatched: false }; }
     try {
       const element = handle.asElement();
       if (!element) return "fill refused: field already has the requested value; choose another useful action";
@@ -29,13 +33,17 @@ export function targetFillScript(documentId: string | undefined, ref: string | u
     const input = ${input};
     const observer = jevSession.observers?.get(page);
     if (!observer) throw new Error("Stale document; observe again");
-    const handle = await observer.evaluateHandle(
+    // Only resolution is recoverable: fill and disposal failures stay terminal.
+    let handle;
+    try {
+      handle = await observer.evaluateHandle(
       (value, input) => {
         const element = value.resolveFill(input.ref, input.documentId);
         const current = "value" in element ? String(element.value) : element.textContent || "";
         return current === input.text ? null : element;
       }, input
     );
+    } catch { return { _jevOutcome: "stale-observation", dispatched: false }; }
     try {
       const element = handle.asElement();
       if (!element) return "fill refused: field already has the requested value; choose another useful action";

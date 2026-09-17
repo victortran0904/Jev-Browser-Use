@@ -36,3 +36,21 @@ Known limits: arbitrary unannotated overlays and complete cross-origin frame/sha
 ## Completed local verification
 
 The reconciled code passed 92 Vitest tests in 24 files, 27 Node integration checks, typechecking, production build and six harness-safety assertions on the VPS. No test or performance assertion was removed or relaxed. The first self-test invocation omitted the TypeScript loader and failed module resolution; rerunning the documented entry point with `node --import tsx` passed. That command mistake is not represented as a product regression or hidden behind an all-green first attempt. Both review stages accept the patch for publication; final live/public-site results remain separate.
+
+## Live follow-through: pre-input target-resolution races
+
+The full VPS run at `440e43b` passed every regression/build check, all twenty deterministic browser journeys and all ten live Jev/Gemini fixture journeys. Its separate public flight attempt stopped on stale state after a dialog changed during model writing. All provider requests in that run succeeded; a successful fixture is still not a verified public fare.
+
+Three further vertical RED/GREEN cycles verify that a changed direct-fill field, changed focused field, and replaced click target return a typed non-dispatched rejection. Each test first failed with a generic boundary error, then passed after narrowing recovery to the read-only handle-resolution phase. Logs are `field-resolution-*`, `focus-resolution-*`, and `click-resolution-*` under the reconnection evidence directory. Existing uncertain-outcome and maximum-two-refresh tests also passed.
+
+### Follow-through stage 1 — specification review
+
+The previous guard covered document changes but not a field/modal/target change detected during subsequent private element resolution. Only that pre-input resolution is now converted into the existing structured non-dispatched result. The controller must obtain a new observation and decision; it does not replay a previous action or reuse its generated text. The original two-refresh, twelve-decision, confidence and provider-budget limits remain unchanged. No exception from the actual click/fill or its disposal is classified as safe to replay. Specification self-review accepts this bounded recovery correction.
+
+### Follow-through stage 2 — code-quality and safety review
+
+After the specification pass, reviewed both fill scripts and the click script. The recoverable catch encloses only private element resolution; actual click/fill and handle disposal are outside it. A transport failure that prevents the boundary from receiving a valid structured outcome still remains uncertain and terminal. No error-message matching, automatic input replay or reuse of stale generated text was added. The controller's existing two-refresh cap and stop checks are preserved. Shared-error identity, JSON serialization, live sensitivity checks, unchanged-value detection and handle disposal remain intact. Code-quality self-review accepts the scoped change; this is not external reviewer approval.
+
+The full local suite passed **95 tests in 25 files** and **27 Node checks**. Typechecking caught a test fixture's missing HTMLInputElement annotation; after correcting only that annotation, all three focused browser regressions, typecheck, build and six harness assertions passed. Raw command logs preserve both the failed typecheck and corrected run.
+
+The older dirty `e2e-worktree` was also inspected and archived: its superseded page-global whole-snapshot cache is preserved as an explicitly non-production patch under `archive/`. Its useful behaviors already exist in the selected private-reference/membership-cache implementation. All current source fixes and the archival evidence are included in this commit; no superseded collector is reintroduced.

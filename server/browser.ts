@@ -168,7 +168,10 @@ export function createBrowserBoundary(
       const scripts: Record<string, string> = {
         click_item: `const observer = jevSession.observers?.get(page);
           if (!observer) throw new Error("Stale document; observe again");
-          const handle = await observer.evaluateHandle((value, input) => value.resolve(input.ref, input.documentId), ${JSON.stringify({ ref: action.target, documentId: observation.documentId })});
+          let handle;
+          try {
+            handle = await observer.evaluateHandle((value, input) => value.resolve(input.ref, input.documentId), ${JSON.stringify({ ref: action.target, documentId: observation.documentId })});
+          } catch { return { _jevOutcome: "stale-observation", dispatched: false }; }
           try {
             const target = handle.asElement();
             if (!target) throw new Error("Stale browser target; observe again");
