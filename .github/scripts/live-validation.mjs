@@ -18,6 +18,7 @@ import { geminiModel, geminiFallbackModel } from "../../server/gemini.ts";
 const actionKinds = new Set(["open_site", "click_item", "type_text", "press_enter", "press_escape", "scroll_down", "scroll_up", "back", "wait", "done", "none"]);
 const report = {
   schemaVersion: 1,
+  runAttempt: Number(process.env.GITHUB_RUN_ATTEMPT || 1),
   commit: /^[a-f0-9]{40}$/.test(process.env.GITHUB_SHA || "") ? process.env.GITHUB_SHA : "local",
   scope: "Unmodified application baseline; live API + real extension/local fixture; not an optimized-build comparison",
   tests: [], requests: [], browserTrace: [],
@@ -256,7 +257,9 @@ try {
       return { ...timings, observationSamples: 10, exactSearchSubmitted: true, transport: "real-browser-control-relay-and-extension" };
     } finally { await boundary.close(id); }
   });
-  if (browserOk && typesafeOk && geminiOk) await check("live-agent-end-to-end-local-search", async () => {
+  // Exercise the complete agent independently: a transient preflight failure
+  // must not prevent testing the real integration. All earlier failures remain failures.
+  if (browserOk && keysPresent) await check("live-agent-end-to-end-local-search", async () => {
     const boundary = createBrowserBoundary();
     const countBefore = searches.length;
     let planCount = 0, writerCount = 0;
@@ -285,7 +288,7 @@ try {
     assert(run.observation?.snapshot.includes("Search complete: architecture smoke"));
     return { plannerCalls: planCount, writerCalls: writerCount, actionCount: actions.length, exactSearchSubmitted: true };
   });
-  else skip("live-agent-end-to-end-local-search", "required-provider-or-browser-check-failed");
+  else skip("live-agent-end-to-end-local-search", "missing-secrets-or-browser-check-failed");
   if (!browserReady) skip("real-browser-navigation-observation-and-actions", "browser-startup-failed");
   report.requestCounts = counts;
 } catch (error) {
