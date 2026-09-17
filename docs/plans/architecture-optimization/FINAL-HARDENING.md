@@ -62,3 +62,21 @@ The exact prompt, confidence threshold, 12-step guard, allowed public domains, n
 Reviewed the actual diff after the specification pass. The new fields are optional for compatibility; model state copies only the public readiness fields and drops extra private metadata. Browser state is captured in the same evaluation as the observation. Failure classification reuses the existing helper instead of maintaining a divergent second classifier. Public-fare assertions and action guards were retained. No dependency, iframe privileges, timeout relaxation, or new purchases are introduced. Quality self-review accepted pending complete-suite and exact-head acceptance. Neither review is independent-agent or Greptile approval.
 
 Complete local follow-through verification exited 0 on the VPS: **72 Vitest tests across 15 files**, **25 Node checks**, typecheck, production build, and six harness assertions passed. The two review passes above are accepted for the code change; exact-head live/model and public-fare outcomes remain separately reported, not inferred from these passing checks.
+
+## Recovery and unchanged-fill follow-through
+
+Run `35274185536` passed deterministic gates and 9/10 live journeys, including the formerly stalled redirect and the flight fixture. Its POST-popup trace included a placeholder target, and a real-browser reproduction separately confirmed that a popup arriving during planning was safely rejected but terminated the run. The public flight attempt repeated fills until its writer budget was exhausted; no fare was verified and no provider failed in that attempt.
+
+Six additional vertical RED/GREEN cycles were executed on the VPS: typed pre-dispatch popup invalidation (generic error before, typed error after); controller re-observation (error before, fresh decision after); unchanged direct fill; unchanged focused fill; precise request-budget classification; and recovery from an unavailable placeholder target. The real-browser unchanged-fill tests require zero input events and no submission. An ambiguous-error negative test and a twelve-step recovery-limit test passed as preservation checks, not invented RED cycles.
+
+### Specification review: recovery and unchanged fills
+
+Recovery is permitted only for backend-generated `StaleObservationError` or `InvalidActionTargetError`, each proving no page action was dispatched. A stale document guard returns its structured marker before activation/input; a placeholder reference fails local validation before any browser command. The controller obtains a new observation and a new decision; it does not retry the old action. Physical-action exceptions, uncertain HTTP outcomes and arbitrary error strings remain terminal. Re-observation consumes the unchanged twelve-decision budget.
+
+Unchanged fills compare exact live text after private element/focus validation, return informative no-op feedback, and never submit automatically. Changed values retain Playwright fill/actionability. Public flight budgets, exact user prompt and dated-CAD evidence checks remain unchanged. Specification self-review accepted for this scoped fix, with complete verification recorded separately.
+
+### Code-quality review after specification review
+
+Reviewed both structured boundary outcomes and the narrow controller catch. Error classes are shared in one small module without a circular dependency. No string-matching recovery or trust in page-authored reference attributes was introduced. Handles are disposed on both changed and unchanged fill paths. Static no-op messages omit entered text. Existing invalid-target messages remain descriptive; unsupported actions are not silently converted into another action.
+
+Reviewed cleanup, stop checks, bounded retry decisions, no-op accounting, and the real-browser plus controller regression tests. Request-budget classification reuses the existing safe diagnostic helper. No dependencies, credentials, actionability bypass or raised budgets were introduced. Quality self-review accepted for the patch, pending final complete-suite and exact-head live acceptance; no independent reviewer approval is claimed.

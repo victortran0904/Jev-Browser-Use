@@ -1,3 +1,4 @@
+import { InvalidActionTargetError, StaleObservationError } from "./browser-errors.js";
 import path from "node:path";
 import { rm } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
@@ -121,23 +122,33 @@ export function createRunController(deps: RunControllerOptions = {}) {
           try { return await work(); } finally { writerMs += performance.now() - start; }
         };
         let result: string;
-        if (action.kind === "open_site") {
-          const knownUrl = action.site ? SITES[action.site] : "";
-          const explicitUrl = extractExplicitUrl(run.goal);
-          const url = action.url || knownUrl || (action.site === "other" ? (explicitUrl ?? await timeWriter(() => writer.generateUrl({ goal: run.goal, history }))) : explicitUrl);
-          if (run.stopped || run.status !== "running") return;
-          result = url ? await browser.open(run.id, url) : "open_site refused: no catalog site matched and the writer supplied no valid URL";
-        } else if (action.kind === "type_text" || action.kind === "fill_item") {
-          const field = action.kind === "fill_item" ? observation.candidates.find(item => item.ref === action.target)?.field : observation.focusedField;
-          if (!field?.isText || field.sensitive) result = "type_text refused: no browser text field is focused";
-          else {
-            const generated = await timeWriter(() => writer.generateText({ goal: run.goal, history, observation: { ...observation, focusedField: field } }));
+        try {
+          if (action.kind === "open_site") {
+            const knownUrl = action.site ? SITES[action.site] : "";
+            const explicitUrl = extractExplicitUrl(run.goal);
+            const url = action.url || knownUrl || (action.site === "other" ? (explicitUrl ?? await timeWriter(() => writer.generateUrl({ goal: run.goal, history }))) : explicitUrl);
             if (run.stopped || run.status !== "running") return;
-            if (!generated.fill || !generated.text) result = `type_text refused: ${generated.reason || "writer declined"}`;
-            else result = await browser.act(run.id, { ...action, value: generated.text }, observation);
+            result = url ? await browser.open(run.id, url) : "open_site refused: no catalog site matched and the writer supplied no valid URL";
+          } else if (action.kind === "type_text" || action.kind === "fill_item") {
+            const field = action.kind === "fill_item" ? observation.candidates.find(item => item.ref === action.target)?.field : observation.focusedField;
+            if (!field?.isText || field.sensitive) result = "type_text refused: no browser text field is focused";
+            else {
+              const generated = await timeWriter(() => writer.generateText({ goal: run.goal, history, observation: { ...observation, focusedField: field } }));
+              if (run.stopped || run.status !== "running") return;
+              if (!generated.fill || !generated.text) result = `type_text refused: ${generated.reason || "writer declined"}`;
+              else result = await browser.act(run.id, { ...action, value: generated.text }, observation);
+            }
+          } else {
+            result = await browser.act(run.id, action, observation);
           }
-        } else {
-          result = await browser.act(run.id, action, observation);
+        } catch (error) {
+          if (!(error instanceof StaleObservationError) && !(error instanceof InvalidActionTargetError)) throw error;
+          if (run.stopped || run.status !== "running") return;
+          history.push("Action rejected before dispatch; no action was sent. Observe again and select a valid current target.");
+          emit(run, "observation_invalidated", "Action rejected before dispatch; observing again", {
+            observationId: observation.id, kind: action.kind, dispatched: false,
+          });
+          continue;
         }
 
         if (run.stopped || run.status !== "running") return;

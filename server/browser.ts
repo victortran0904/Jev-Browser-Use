@@ -1,3 +1,4 @@
+import { InvalidActionTargetError, StaleObservationError } from "./browser-errors.js";
 import { focusedFillScript, targetFillScript } from "./browser-actions.js";
 import { sessionPrelude, sessionCleanup } from "./browser-session.js";
 import { observerSource } from "./observer.js";
@@ -35,7 +36,7 @@ export function parseSnapshot(snapshot: string): Candidate[] {
 export function validateAction(action: PlannedAction, observation: Observation): PlannedAction {
   if (action.observationId !== observation.id) throw new Error("Stale observation: refresh before acting");
   if (!actionKinds.has(action.kind)) throw new Error("Unsupported browser action");
-  if ((action.kind === "click_item" || action.kind === "fill_item") && !observation.candidates.some((item) => item.ref === action.target)) throw new Error("Target is not in the current observation");
+  if ((action.kind === "click_item" || action.kind === "fill_item") && !observation.candidates.some((item) => item.ref === action.target)) throw new InvalidActionTargetError();
   if (action.kind === "type_text" && !observation.focusedField?.isText) throw new Error("No browser text field is focused");
   return action;
 }
@@ -190,11 +191,14 @@ export function createBrowserBoundary(
           if (!observer || jevSession.active !== page) throw new Error("Document changed");
           await observer.evaluate((value, input) => value.verifyDocument(input.id, input.url), ${JSON.stringify({ id: observation.documentId, url: observation.url })});
           ${action.kind === "press_enter" && observation.focusedField ? `await observer.evaluate((value, id) => { value.resolveFocus(id); return true; }, ${JSON.stringify(observation.documentId)});` : ""}
-        } catch { throw new Error("Stale browser document or focus; observe again"); }
+        } catch { return { _jevOutcome: "stale-observation", dispatched: false }; }
       ` : "";
       const activate = options.activateTargetBeforeAction === false ? "" : "await page.bringToFront();\n";
-      const result = await withBrowserInput(command, async () => String(await execute(`jev-${runId}`, documentGuard + activate + script)));
-      return result;
+      const result = await withBrowserInput(command, () => execute(`jev-${runId}`, documentGuard + activate + script));
+      if (result && typeof result === "object"
+          && (result as { _jevOutcome?: unknown })._jevOutcome === "stale-observation"
+          && (result as { dispatched?: unknown }).dispatched === false) throw new StaleObservationError();
+      return String(result);
     },
     async close(runId) {
       const session = `jev-${runId}`;

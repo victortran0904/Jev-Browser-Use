@@ -6,3 +6,8 @@ test('direct fills are recorded as valid without copying field values',()=>{
   assert.equal(output.kind,'fill_item');
   assert(!JSON.stringify(output).includes('PRIVATE_TYPED_VALUE'));
 });
+
+test('bounded flight writer exhaustion is reported as request-budget, not an unknown runtime error', async () => {
+  const { failureCategory } = await import('./trace.mjs');
+  assert.equal(failureCategory(new Error('Flight writer budget exceeded')), 'request-budget');
+});
