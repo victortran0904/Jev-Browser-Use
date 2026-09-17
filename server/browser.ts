@@ -110,7 +110,7 @@ export function createBrowserBoundary(command: CommandRunner = defaultCommandRun
       const url=new URL(rawUrl);
       if (url.protocol!=="https:") return "open_site refused: writer did not provide a valid HTTPS URL";
       latest.delete(runId);
-      const result=await execute(runId,`${prefix}\nawait p.goto(${JSON.stringify(url.href)}); return p.url();`);
+      const result=await execute(runId,`${prefix}\nawait p.goto(${JSON.stringify(url.href)}, {waitUntil:"domcontentloaded", timeout:15000}); return p.url();`);
       return `opened ${String(result||url.href)}`;
     },
     async act(runId,action,observation) {
@@ -130,7 +130,7 @@ export function createBrowserBoundary(command: CommandRunner = defaultCommandRun
         wait:`await p.waitForTimeout(1000); return "waited";`,
       };
       if(!scripts[action.kind]) throw new Error(`Action ${action.kind} cannot be executed by the browser boundary`);
-      const guard=`if(!state.__jevObserver || state.__jevObserverPage!==p) throw new Error("Stale observation: target changed"); await state.__jevObserver.evaluate((api,id)=>api.assertDocument(id),${JSON.stringify(observation.documentId)});`;
+      const guard=action.kind==="wait" ? "" : `if(!state.__jevObserver || state.__jevObserverPage!==p) throw new Error("Stale observation: target changed"); await state.__jevObserver.evaluate((api,id)=>api.assertDocument(id),${JSON.stringify(observation.documentId)});`;
       return String(await execute(runId,`${prefix}\n${guard}\n${scripts[action.kind]}`));
     },
     async close(runId) {
