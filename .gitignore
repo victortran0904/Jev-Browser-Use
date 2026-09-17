@@ -5,3 +5,4 @@ dist-server/
 .runs/
 *.log
 *.tsbuildinfo
+*.mp4

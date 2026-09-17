@@ -11,7 +11,7 @@ export function createApp(controller: RunController = defaultRuns) {
   app.get("/api/status", (_req, res) => res.json({ ok: true, service: "Jev Browser Agent", runs: controller.list().length }));
   app.get("/api/runs", (_req, res) => res.json(controller.list()));
   app.post("/api/runs", (req, res, next) => {
-    try { res.status(201).json(controller.start({ goal: String(req.body.goal ?? ""), startUrl: String(req.body.startUrl ?? ""), values: Array.isArray(req.body.values) ? req.body.values.map(String) : [] })); }
+    try { res.status(201).json(controller.start({ goal: String(req.body.goal ?? "") })); }
     catch (error) { next(error); }
   });
   app.get("/api/runs/:id", (req, res) => { const run = controller.get(req.params.id); if (!run) return res.status(404).json({ error: "Run not found" }); res.json(run); });
