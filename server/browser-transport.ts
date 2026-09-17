@@ -27,10 +27,11 @@ async function httpCommand(args: string[]): Promise<string | null> {
       const code = args.at(-1);
       if (!sessionId || !code) return null;
       const res = await fetch(`${RELAY_ENDPOINT}/cli/execute`, {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sessionId, code, createIfMissing: true }), signal: AbortSignal.timeout(30000),
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sessionId, code, createIfMissing: false }), signal: AbortSignal.timeout(30000),
       });
       if (!res.ok) throw Object.assign(new Error(`Relay rejected command (HTTP ${res.status})`), { kind: "rejected" });
       const data = (await res.json()) as { ok?: boolean; isError?: boolean; error?: unknown; value?: unknown; text?: string };
+      if (!data || typeof data !== 'object' || !('ok' in data || 'isError' in data || 'value' in data || 'error' in data)) throw new Error('Malformed relay response');
       return JSON.stringify({ ok: data.ok !== false && !data.isError && !data.error, value: data.value, text: data.text, error: data.error });
     }
     if (args[0] === "session" && args[1] === "delete" && args[2]) {
@@ -44,11 +45,15 @@ async function httpCommand(args: string[]): Promise<string | null> {
   } catch (error) {
     if (error && typeof error === "object" && "kind" in error) throw error;
     if (args[0] === "execute") throw new Error("Browser command outcome unknown; do not replay", { cause: error });
+    const cause=error && typeof error==='object' && 'cause' in error ? error.cause : undefined;
+    const refused=cause && typeof cause==='object' && 'code' in cause && cause.code==='ECONNREFUSED';
+    if(args[0]==='session' && args[1]==='new' && !refused) throw new Error('Browser session creation outcome unknown; do not replay',{cause:error});
     return null;
   }
 }
 export const defaultCommandRunner: CommandRunner = async (args) => {
   const httpResult = await httpCommand(args);
   if (httpResult !== null) return httpResult;
-  return (await execFileAsync(cli, args, { maxBuffer: 8 * 1024 * 1024, timeout: 30_000 })).stdout;
+  const env=Object.fromEntries(Object.entries(process.env).filter(([key]) => ["PATH","HOME","DISPLAY","XAUTHORITY","TMPDIR","LANG","LD_LIBRARY_PATH"].includes(key) || key.startsWith("BROWSER_CONTROL_")));
+  return (await execFileAsync(cli, args, { maxBuffer: 8 * 1024 * 1024, timeout: 30_000, env })).stdout;
 };
