@@ -35,7 +35,7 @@ async function httpCommand(args: string[]): Promise<string | null> {
       const res = await fetch(`${RELAY_ENDPOINT}/cli/execute`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionId, code, createIfMissing: true }),
+        body: JSON.stringify({ sessionId, code, createIfMissing: !args.includes("--existing") }),
         signal: AbortSignal.timeout(30000),
       });
       if (!res.ok) return JSON.stringify({ ok: false, error: `Relay HTTP ${res.status}; action was not retried` });
@@ -78,5 +78,6 @@ async function httpCommand(args: string[]): Promise<string | null> {
 export const defaultCommandRunner: CommandRunner = async (args) => {
   const httpResult = await httpCommand(args);
   if (httpResult !== null) return httpResult;
+  if (args.includes("--existing")) throw new Error("Existing browser session is unavailable; no session created");
   return (await execFileAsync(cli, args, { maxBuffer: 8 * 1024 * 1024, timeout: 30_000 })).stdout;
 };

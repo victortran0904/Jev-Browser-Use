@@ -21,7 +21,6 @@ export function collectObservation() {
               let ref = registry.ids.get(el);
               if (!ref) { ref = "e" + (++registry.next); registry.ids.set(el, ref); }
               registry.nodes.set(ref, el);
-              el.setAttribute("data-jev-ref", ref);
               const tag = el.tagName.toLowerCase();
               const type = (el.getAttribute("type") || "").toLowerCase();
               const role = el.getAttribute("role") || (tag === "a" ? "link" : tag === "button" ? "button" : tag === "select" ? "combobox" : tag === "textarea" ? "textbox" : tag === "input" ? (type === "search" ? "searchbox" : type === "submit" ? "button" : "textbox") : el.isContentEditable ? "textbox" : tag);

@@ -1,3 +1,4 @@
+import { createTargetTracker } from "./browser-targets.js";
 import { targetSource } from "./action-target.js";
 import { collectorSource } from "./observer.js";
 import { defaultCommandRunner, type CommandRunner } from "./browser-transport.js";
@@ -49,6 +50,7 @@ export function createBrowserBoundary(
   options: BrowserBoundaryOptions = {},
 ): BrowserBoundary {
   const sessions = new Set<string>();
+  const targets = createTargetTracker(command);
   const closed = new Set<string>();
   async function ensureSession(session: string) {
     if (closed.has(session)) throw new Error("Browser run is closed");
@@ -58,6 +60,7 @@ export function createBrowserBoundary(
   }
   async function execute(session: string, code: string, cleanup = false): Promise<unknown> {
     if (!cleanup) await ensureSession(session);
+    const activeSession = targets.active(session);
     try {
       const wrapped = `
         const rootPage = page;
@@ -69,6 +72,13 @@ export function createBrowserBoundary(
           p.on("popup", onPopup);
         };
         watch(rootPage);
+        if (!runtime.cdp) {
+          runtime.cdp = await rootPage.context().newCDPSession(rootPage);
+          runtime.popupVersion = 0;
+          runtime.cdp.on("Page.windowOpen", () => { runtime.popupVersion++; });
+          await runtime.cdp.send("Page.enable");
+          runtime.targetId = (await runtime.cdp.send("Target.getTargetInfo")).targetInfo.targetId;
+        }
         while (!${cleanup} && runtime.pending.length) {
           const next = runtime.pending.shift();
           if (!next.isClosed()) {
@@ -76,11 +86,18 @@ export function createBrowserBoundary(
             await next.waitForLoadState("domcontentloaded", { timeout: 8000 });
           }
         }
-        { const page = runtime.active; ${code} }
+        const output = await (async () => { const page = runtime.active; ${code} })();
+        return { __jevBoundary: true, value: output, targetId: runtime.targetId,
+          popupVersion: runtime.popupVersion, localPopup: runtime.active !== rootPage };
       `;
-      const stdout = await command(["execute", "--json", "--session", session, wrapped]);
+      const stdout = await command(["execute", "--json", "--session", activeSession, wrapped]);
       const envelope = JSON.parse(stdout) as Envelope;
       if (!envelope.ok) throw new Error(typeof envelope.error === "string" ? envelope.error : envelope.error?.message ?? envelope.text ?? "Browser Control failed");
+      const packet = envelope.value as { __jevBoundary?: boolean; value?: unknown; targetId?: string; popupVersion?: number; localPopup?: boolean };
+      if (packet?.__jevBoundary) {
+        targets.remember(session, activeSession, packet);
+        return packet.value;
+      }
       return envelope.value;
     } catch (error) {
       throw new Error(`Browser Control unavailable: ${error instanceof Error ? error.message : String(error)}`);
@@ -116,7 +133,12 @@ export function createBrowserBoundary(
         ${screenshotSnippet}
         return { ...dom, url: page.url(), title: await page.title() };
       `;
-      const value = await execute(`jev-${runId}`, observeScript) as { documentId?: string; candidates?: Candidate[]; pageText?: string; focusedField?: FocusedField | null; url?: string; title?: string };
+      const root = `jev-${runId}`;
+      if (closed.has(root)) throw new Error("Browser run is closed");
+      await targets.discover(root);
+      let raw = await execute(root, observeScript);
+      if (await targets.discover(root)) raw = await execute(root, observeScript);
+      const value = raw as { documentId?: string; candidates?: Candidate[]; pageText?: string; focusedField?: FocusedField | null; url?: string; title?: string };
       const candidates = value.candidates ?? [];
       const snapshot = `${candidates.map((item) => `${item.label} [ref=${item.ref}]`).join("\n")}\n\nVisible page text:\n${value.pageText ?? ""}`.slice(0, 30_000);
       return {
@@ -151,7 +173,7 @@ export function createBrowserBoundary(
       };
       const script = scripts[action.kind];
       if (!script) throw new Error(`Action ${action.kind} cannot be executed by the browser boundary`);
-      const result = String(await execute(`jev-${runId}`, script));
+      const result = String(await execute(`jev-${runId}`, `await page.bringToFront(); ${script}`));
       return result;
     },
     async close(runId) {
@@ -159,24 +181,24 @@ export function createBrowserBoundary(
       if (closed.has(session)) return;
       closed.add(session);
       if (sessions.has(session)) {
-        await execute(session, `
-          const runtime = state.jevRuntime;
-          if (runtime) {
-            for (const [owned, listener] of runtime.watched) {
-              owned.off("popup", listener);
-              if (owned !== rootPage && !owned.isClosed()) await owned.close().catch(() => {});
+        for (const ownedSession of targets.owned(session).reverse()) {
+          await command(["execute", "--json", "--session", ownedSession, "--existing", `
+            const runtime = state.jevRuntime;
+            if (runtime) {
+              for (const [owned, listener] of runtime.watched) {
+                owned.off("popup", listener);
+                if (owned !== page && !owned.isClosed()) await owned.close().catch(() => {});
+              }
+              await runtime.cdp?.detach().catch(() => {});
+              delete state.jevRuntime;
             }
-            delete state.jevRuntime;
-          }
-          return true;
-        `, true).catch(() => {});
+            return true;
+          `]).catch(() => {});
+          await command(["session", "delete", ownedSession]).catch(() => {});
+        }
       }
       sessions.delete(session);
-      try {
-        await command(["session", "delete", session]);
-      } catch {
-        // ignore errors during cleanup
-      }
+      targets.forget(session);
     },
   };
 }
