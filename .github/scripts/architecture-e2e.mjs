@@ -13,10 +13,11 @@ import {createRunController} from '../../server/runs.ts';
 import {createPlanner} from '../../server/planner.ts';
 import {createWriter} from '../../server/writer.ts';
 import {traceStep,failureCategory} from '../../integration/trace.mjs';
-import {fixtureResponse,journeys,exercise,flightPrompt} from '../../integration/journeys.mjs';
+import {fixtureResponse,journeys,exercise} from '../../integration/journeys.mjs';
+import {runPublicFlight, flightPrompt} from './public-flight.mjs';
 
 const mode=process.argv.includes('--public-flight')?'public-flight':process.argv.includes('--live')?'live':'deterministic';
-const report={schemaVersion:1,mode,commit:process.env.GITHUB_SHA||'local',runAttempt:Number(process.env.GITHUB_RUN_ATTEMPT||1),tests:[],requests:[]};
+const report={schemaVersion:1,mode,runner:process.env.RUNNER_NAME||"oracle-free-local",commit:process.env.GITHUB_SHA||'local',runAttempt:Number(process.env.GITHUB_RUN_ATTEMPT||1),tests:[],requests:[]};
 const counts={typesafe:0,gemini:0};
 const classify=failureCategory;
 const originalFetch=globalThis.fetch;
@@ -80,7 +81,7 @@ try {
   relayProcess=spawn(process.execPath,[path.resolve('node_modules/@opencode-ai/browser-control/dist/cli.js'),'serve'],{env:childEnv,stdio:'ignore'});
   const extension=path.resolve('node_modules/@opencode-ai/browser-control/extension/dist');
   // The disposable CI browser permits popup behavior, as Playwright normally does.
-  browserProcess=spawn(chromium.executablePath(),[`--user-data-dir=${path.join(temp,'profile')}`,`--disable-extensions-except=${extension}`,`--load-extension=${extension}`,'--no-first-run','--no-default-browser-check','--no-sandbox','--disable-dev-shm-usage','--ignore-certificate-errors','--disable-background-networking','--disable-popup-blocking','about:blank'],{env:childEnv,stdio:'ignore'});
+  browserProcess=spawn(chromium.executablePath(),[`--user-data-dir=${path.join(temp,'profile')}`,`--disable-extensions-except=${extension}`,`--load-extension=${extension}`,'--no-first-run','--no-default-browser-check','--no-sandbox','--disable-dev-shm-usage','--ignore-certificate-errors','--disable-background-networking','--disable-popup-blocking',...(!process.env.DISPLAY?['--headless=new']:[]),'about:blank'],{env:childEnv,stdio:'ignore'});
   relayProcess.on('error',()=>{});browserProcess.on('error',()=>{});
   let ready=false;const deadline=performance.now()+45000;
   while(performance.now()<deadline){
@@ -91,34 +92,21 @@ try {
   const boundary=createBrowserBoundary();
   const logger={debug(){},info(){},warn(){},error(){}};
   const makePlanner=()=>createPlanner(new TypeSafeClient({timeout:25000,retry:{maxRetries:1,backoffInitialMs:500,backoffMaxMs:1000,maxRetryAfterMs:2000},logger}));
-  async function liveRun(scenario,publicFlight=false) {
-    const safeBoundary=publicFlight?{...boundary,act:async(id,action,observation)=>{
-      const target=observation.candidates.find(c=>c.ref===action.target);
-      if(target&&/\b(book|purchase|reserve|checkout|pay|sign.in|log.in)\b/i.test(target.label)) throw new Error('Read-only flight test refused consequential action');
-      return boundary.act(id,action,observation);
-    }}:boundary;
+  async function liveRun(scenario) {
     const trace=[];const realPlanner=makePlanner();
-    const controller=createRunController({browser:safeBoundary,planner:{plan:async input=>{const action=await realPlanner.plan(input);trace.push(traceStep(action,input.observation,scenario.steps));return action;}},writer:createWriter(),enableScreenshots:false});
-    const goal=publicFlight?`${flightPrompt}. Test assumptions: today is September 17, 2026; December means December 2026; currency CAD; one-way economy for one adult. Search public information only. Do not book, sign in, enter personal information, or bypass CAPTCHA. Stop only when a matching dated fare is visible.`:`Open ${scenario.url}. ${scenario.goal} Stop only when the requested result is visibly complete.`;
+    const controller=createRunController({browser:boundary,planner:{plan:async input=>{const action=await realPlanner.plan(input);trace.push(traceStep(action,input.observation,scenario.steps));return action;}},writer:createWriter(),enableScreenshots:false});
+    const goal=`Open ${scenario.url}. ${scenario.goal} Stop only when the requested result is visibly complete.`;
     const run=controller.start({goal});controllers.push([controller,run]);
     await controller.settled(run.id);
     if(run.status==='error') throw Object.assign(new Error(run.error||'Run failed'),{trace,stepCount:run.stepCount});
     const final=run.observation;
-    if(publicFlight) {
-      // A landing-page teaser or model declaration is not verified fare evidence.
-      const line=(final?.pageContext||final?.snapshot||'').split('\n').find(l=>/Hanoi|\bHAN\b/i.test(l)&&/Vancouver|\bYVR\b/i.test(l)&&/Dec(?:ember)?\s+\d{1,2}.*2026|2026-12-\d{2}/i.test(l)&&/CAD|CA\$/i.test(l));
-      const fare=line?.match(/(?:CAD\s*\$?|CA\$)\s*([\d,]+(?:\.\d{2})?)/i);
-      const amount=fare?Number(fare[1].replace(/,/g,'')):NaN;
-      assert(Number.isFinite(amount)&&amount>0&&amount<2500,'No verified dated flight under CAD 2500');
-      return {verifiedFare:true,amountCAD:amount,sourceOrigin:new URL(final.url).origin,stepCount:run.stepCount};
-    }
     if(!final?.snapshot.includes(scenario.proof)) throw Object.assign(new Error('Missing visible completion evidence'),{trace,stepCount:run.stepCount});
     assert.equal(run.status,'complete');
     return {stepCount:run.stepCount,timings:run.timings,trace};
   }
   if(mode==='public-flight') {
     report.originalPrompt=flightPrompt;report.assumptions={month:'2026-12',currency:'CAD',trip:'one-way',adults:1,cabin:'economy'};
-    await check('public-flight-HAN-YVR-December',()=>liveRun({},true));
+    await check('public-flight-HAN-YVR-December',()=>runPublicFlight({boundary,planner:makePlanner(),writer:createWriter(),report}));
   } else {
     for(const scenario of journeys(base)) await check(scenario.id,async()=>{
       if(mode==='live') {

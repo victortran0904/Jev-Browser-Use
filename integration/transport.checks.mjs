@@ -28,7 +28,7 @@ test('a lost mutation response is outcome-unknown and is not replayed',async()=>
 });
 test('HTTP rejection is surfaced without a second execution',async()=>{
   const original=globalThis.fetch;globalThis.fetch=async()=>Response.json({error:'rejected'},{status:403});
-  try {const {defaultCommandRunner}=await import('../server/browser.ts');await assert.rejects(defaultCommandRunner(['execute','--json','--session','s','return true']),/rejected.*403/i);}
+  try {const {defaultCommandRunner}=await import('../server/browser.ts');const result=JSON.parse(await defaultCommandRunner(['execute','--json','--session','s','return true']));assert.equal(result.ok,false);assert.match(result.error,/403/);}
   finally {globalThis.fetch=original;}
 });
 test('negative execution envelopes stay unsuccessful',async()=>{

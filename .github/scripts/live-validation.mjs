@@ -71,7 +71,7 @@ if (process.argv.includes("--self-test")) {
   assert.equal(safeName("not a model?secret=value"), "unavailable");
   assert.equal(safeName("gemini-3.5-flash-lite"), "gemini-3.5-flash-lite");
   assert.equal(flightEvidence({ pageText: "No fare available" }).priceBelowLimitPresent, false);
-  assert.equal(flightEvidence({ pageText: "Hanoi to Vancouver December CAD 2200" }).priceBelowLimitPresent, true);
+  assert.equal(flightEvidence({ pageText: "Hanoi HAN to Vancouver YVR December 8, 2026 CAD 2200" }).priceBelowLimitPresent, true);
   console.log("PASS verification-harness-safety (6 assertions; no external requests)");
   process.exit(0);
 }
@@ -206,7 +206,7 @@ try {
     const extension = path.resolve("node_modules/@opencode-ai/browser-control/extension/dist");
     browserProcess = spawn(chromium.executablePath(), [
       `--user-data-dir=${path.join(temp, "profile")}`, `--disable-extensions-except=${extension}`, `--load-extension=${extension}`,
-      "--no-first-run", "--disable-popup-blocking", "--no-default-browser-check", "--no-sandbox", "--disable-dev-shm-usage", "--ignore-certificate-errors", "--disable-background-networking", "about:blank",
+      "--no-first-run", "--disable-popup-blocking", "--no-default-browser-check", "--no-sandbox", "--disable-dev-shm-usage", ...(!process.env.DISPLAY ? ["--headless=new"] : []), "--ignore-certificate-errors", "--disable-background-networking", "about:blank",
     ], { env: childEnv, stdio: "ignore" });
     browserProcess.on("error", () => {});
     const deadline = Date.now() + 45_000;

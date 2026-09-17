@@ -29,9 +29,12 @@ export function registerScenarios({ routes, cases, boundary, url, html, click, o
     await start(id, '/search'); await fill(id, 'Search query', 'architecture smoke');
     await click(id, await boundary.observe(id), 'Submit search');
     const o = await observeUntil(id, o => o.pageText.includes('Exact search complete'));
+    const backStarted = performance.now();
     await boundary.act(id, { kind: 'back', observationId: o.id }, o);
     const back = await boundary.observe(id); assert(back.candidates.some(c => c.label.includes('Search query')));
-    return { exactSearchAndBack: true };
+    const backRecoveryMs = Math.round(performance.now() - backStarted);
+    assert(backRecoveryMs < 1500, `Back navigation paid an unnecessary load-state timeout: ${backRecoveryMs}ms`);
+    return { exactSearchAndBack: true, backRecoveryMs };
   }]);
   routes.set('/dynamic', (_req, res) => res.end(html(`<button onclick="document.querySelector('dialog').showModal()">Show results</button><nav>${'Long navigation text '.repeat(1000)}</nav><dialog><h2>Search complete</h2><p role="status">Matching option found</p><button onclick="this.closest('dialog').close()">Close results</button></dialog>`)));
   cases.push(['06-dynamic-dialog-context', async id => {

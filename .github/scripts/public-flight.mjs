@@ -7,13 +7,23 @@ const prohibited = /\b(book(?:ing)?|buy|purchase|pay(?:ment)?|checkout|reserve|s
 
 export function flightEvidence(observation) {
   const text = observation?.pageText ?? observation?.snapshot ?? '';
-  const prices = [...text.matchAll(/(?:CAD|CA\$|C\$|USD|US\$|\$)\s*([0-9][0-9,]*(?:\.[0-9]{2})?)/g)]
-    .map(match => Number(match[1].replaceAll(',', ''))).filter(value => Number.isFinite(value) && value > 0);
+  const origin = /\b(Hanoi|Hà Nội|HAN)\b/i;
+  const destination = /\b(Vancouver|YVR)\b/i;
+  const datedDecember = /\b(?:December|Dec)\.?\s+(?:[1-9]|[12]\d|3[01]),?\s+2026\b|\b2026-12-(?:0[1-9]|[12]\d|3[01])\b/i;
+  // Conservative acceptance: route, dated December 2026 departure, and explicit
+  // CAD fare must occur in the same itinerary line. Generic $, form budgets,
+  // hotel promotions and model-declared completion are not fare evidence.
+  const matchingLine = text.split("\n").find(line => {
+    if (!origin.test(line) || !destination.test(line) || !datedDecember.test(line)) return false;
+    const fare = line.match(/(?:CAD\s*\$?|CA\$|C\$)\s*([0-9][0-9,]*(?:\.[0-9]{2})?)/);
+    const amount = fare ? Number(fare[1].replaceAll(',', '')) : NaN;
+    return amount > 0 && amount < 2500 && !/hotel|per night|budget|maximum|example|test data|fixture/i.test(line);
+  });
   return {
-    originPresent: /\b(Hanoi|Hà Nội|HAN)\b/i.test(text),
-    destinationPresent: /\b(Vancouver|YVR)\b/i.test(text),
-    decemberPresent: /\b(December|Dec)\b|2026-12/.test(text),
-    priceBelowLimitPresent: prices.some(price => price < 2500),
+    originPresent: origin.test(text),
+    destinationPresent: destination.test(text),
+    decemberPresent: datedDecember.test(text),
+    priceBelowLimitPresent: Boolean(matchingLine),
     blockedPage: /captcha|unusual traffic|verify you are human|access denied/i.test(text),
   };
 }
@@ -62,7 +72,7 @@ export async function runPublicFlight({ boundary, planner, writer, report }) {
     const evidence = flightEvidence(run.observation);
     const last = run.events.filter(event => event.type === 'plan').at(-1)?.data?.kind;
     report.publicFlight = {
-      prompt: flightPrompt, status: run.status, stopped: Boolean(run.stopped),
+      prompt: flightPrompt, acceptanceAssumptions: {month: "2026-12", currency: "CAD", oneWay: true, adults: 1}, status: run.status, stopped: Boolean(run.stopped),
       plannerCalls, writerCalls, trace, ...evidence,
       outcome: 'Public-site exploration, not a booking or a verified fare quote',
       ...(run.error ? { failed: true, failureCategory: /TypeSafe/i.test(run.error) ? 'typesafe' : /Gemini/i.test(run.error) ? 'gemini' : /stale/i.test(run.error) ? 'stale-state' : /12-step/i.test(run.error) ? 'step-budget' : /budget/i.test(run.error) ? 'request-budget' : 'browser-or-policy' } : {}),

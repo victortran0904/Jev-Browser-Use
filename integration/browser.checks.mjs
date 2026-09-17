@@ -37,7 +37,7 @@ test('focused snapshots refresh live properties while reusing page context',asyn
     await f.page.locator('input').evaluate(e=>e.value='fixture query');
     const b=await f.boundary.observe('test');
     assert.equal(b.focusedField.value,'fixture query');
-    assert.equal(b.pageContext,a.pageContext);
+    assert.equal(b.pageText,a.pageText);
     assert.equal(b.metrics.mode,'focused');
   } finally {await f.close();}
 });

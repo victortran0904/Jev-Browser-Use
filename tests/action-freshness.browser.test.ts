@@ -29,3 +29,13 @@ it("does not press Enter in a document navigated after the observation", async (
     await expect(f.boundary.act("test", { kind: "press_enter", observationId: old.id }, old)).rejects.toThrow(/stale/i);
   } finally { await f.close(); }
 });
+
+it("allows a read-only wait after navigation without authorizing stale input", async () => {
+  const f = await browserFixture('<main><input aria-label="Search"></main>');
+  try {
+    const old = await f.boundary.observe("test");
+    await f.page.goto('data:text/html,<h1>New document</h1>');
+    await expect(f.boundary.act("test", { kind: "wait", observationId: old.id }, old)).resolves.toBe("waited");
+    await expect(f.boundary.act("test", { kind: "press_enter", observationId: old.id }, old)).rejects.toThrow(/stale/i);
+  } finally { await f.close(); }
+});

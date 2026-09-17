@@ -54,7 +54,7 @@ jobs:
           ENABLE_SCREENSHOTS: 'false'
           CI: 'true'
           JOURNEY_MODE: ${{ matrix.mode }}
-        run: xvfb-run -a node --import tsx --import ./integration/report-on-exit.mjs --import ./integration/target-diagnostics.mjs .github/scripts/architecture-e2e.mjs "--$JOURNEY_MODE"
+        run: xvfb-run -a node --import tsx --import ./integration/report-on-exit.mjs .github/scripts/architecture-e2e.mjs "--$JOURNEY_MODE"
       - name: Upload sanitized result metadata only
         if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f

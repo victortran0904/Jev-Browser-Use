@@ -1,19 +1,20 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createBrowserBoundary} from '../server/browser.ts';
 import {fixture} from './browser-fixture.mjs';
-test('a relay child keeps its existing session and unrelated sessions are ignored',async()=>{
-  let child=false;const visited=[];
-  const source={snapshot:async()=>[{id:'root',session:'jev-parent'},...(child?[{id:'stranger',session:'other-run',opener:'other-root'},{id:'child',session:'child-session',opener:'root'}]:[])],close(){}};
-  const boundary=createBrowserBoundary(async args=>{
-    if(args[0]!=='execute')return JSON.stringify({ok:true});
-    const session=args[args.indexOf('--session')+1];visited.push(session);
-    return JSON.stringify({ok:true,value:{url:'about:blank',title:session,candidates:[],pageText:session}});
-  },{targetSource:source});
-  await boundary.begin('parent');await boundary.observe('parent');child=true;
-  const current=await boundary.observe('parent');
-  assert.equal(current.title,'child-session');assert(!visited.includes('other-run'));
-  await boundary.close('parent');
+test('a run follows only its own real popup and keeps the unrelated session intact',async()=>{
+  const f=await fixture(url=>url.pathname==='/child'?'<h1>Original child result</h1>':'<a href="/child" target="_blank">Open child</a>');
+  try {
+    await f.boundary.begin('stranger');
+    await f.sessions.get('jev-stranger').page.setContent('<h1>Unrelated session</h1>');
+    const o=await f.boundary.observe('test');
+    const popup=f.page.waitForEvent('popup');
+    await f.boundary.act('test',{kind:'click_item',target:o.candidates[0].ref,observationId:o.id},o);
+    await (await popup).waitForLoadState('domcontentloaded');
+    assert((await f.boundary.observe('test')).snapshot.includes('Original child result'));
+    assert.equal(f.requests.filter(r=>new URL(r.url).pathname==='/child').length,1);
+    await f.boundary.close('test');
+    assert((await f.boundary.observe('stranger')).snapshot.includes('Unrelated session'));
+  } finally {await f.boundary.close('stranger');await f.close();}
 });
 test('Enter refuses a field that changed focus after planning',async()=>{
   const f=await fixture('<input aria-label="First"><input aria-label="Second">');

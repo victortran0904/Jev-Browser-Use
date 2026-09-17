@@ -53,7 +53,7 @@ jobs:
 
   live:
     needs: regression
-    if: github.repository == 'victortran0904/Jev-Browser-Use' && github.ref == 'refs/heads/perf/browser-architecture-20260917'
+    if: github.repository == 'victortran0904/Jev-Browser-Use' && github.ref == 'refs/heads/perf/browser-architecture-20260917' && (github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[hosted-live]'))
     runs-on: ubuntu-24.04
     timeout-minutes: 12
     steps:

@@ -47,3 +47,22 @@ The final clean-install fixture measured a **129 ms focus-click median** and **7
 The old baseline was 31 tests. Three implementation-coupled boundary tests were replaced by real browser coverage, rather than keeping assertions that forced a one-second timeout and URL reloading.
 
 GitHub Actions and the exact public-flight prompt are separately reported in the PR and STATUS.md; their outcome is not inferred from this local suite.
+
+## VPS reconciliation follow-through: cycles 47–52
+
+The implementations diverged from `964b286`; both histories were retained by merge `543cac4`. The canonical version was selected using fresh real-relay tests on the Oracle VPS. Test-contract migrations from the alternative collector are not represented as product RED/GREEN fixes.
+
+| Behavior | Actual RED | Actual GREEN |
+|---|---|---|
+| 47: available planner actions | Empty viewport offered click/fill/type/Enter | Unavailable action kinds excluded through public planner API |
+| 48: read-only wait after navigation | Wait rejected by stale-document guard | Wait allowed; stale Enter still rejected |
+| 49: private field metadata | Planner packet included private test signature | Public allowlist excludes it and preserves useful values |
+| 50: field identity in action history | Typing history lost Destination identity | Destination retained without echoing typed text |
+| 51: Back recovery through actual relay | 8,112 ms; failed 1,500 ms fixture threshold | 146 ms using current readiness instead of missing load event |
+| 52: dated flight evidence | Unrelated CAD 99 hotel price accepted | Same-line route/date/CAD evidence required; hotel/budget rejected |
+
+Each RED command exited 1 and its corresponding GREEN exited 0. Raw outputs are retained outside source control in `evidence/resume-vps` with numbered RED/GREEN log names. Additional USD/no-date/exact-upper-bound/positive fare controls were added after GREEN without pretending each began RED.
+
+Combined local verification: **65 Vitest tests in 13 files**, **22 Node invariant checks**, typecheck, build and six harness assertions passed. Both sets of ten deterministic workflows passed through actual Chromium, extension and relay. After the final GREEN-only array-copy refactor, the canonical suite measured 220 ms focus-click median, 75 ms redirect navigation and 209 ms Back recovery. These are small-fixture measurements, not a universal end-to-end speedup; the isolated Back comparison above uses the same fixture and VPS.
+
+Secret-backed provider and public-flight results belong to the exact-head Oracle VPS Actions job. No public fare or live model pass is inferred from deterministic success. No model credential was fetched out of Actions.

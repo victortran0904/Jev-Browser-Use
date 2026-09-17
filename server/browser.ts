@@ -125,7 +125,9 @@ export function createBrowserBoundary(
             const oldObserver = jevSession.observers.get(page);
             jevSession.observers.delete(page);
             await oldObserver?.dispose().catch(() => {});
-            await page.waitForLoadState("domcontentloaded", { timeout: 8000 }).catch(() => {});
+            // BFCache restores may not emit another DOMContentLoaded event.
+            // Read the current document readiness instead of paying an event timeout.
+            await page.waitForFunction(() => document.readyState !== "loading" && Boolean(document.body), null, { timeout: 8000 });
             dom = await extract();
           } else {
             throw e;
@@ -171,8 +173,8 @@ export function createBrowserBoundary(
             await target.click({ timeout: 5000 });
           } finally { await handle.dispose(); }
           return ${JSON.stringify(`clicked ${observation.candidates.find((item) => item.ref === action.target)?.label ?? action.target}`)};`,
-        fill_item: targetFillScript(observation.documentId, action.target, action.value ?? ""),
-        type_text: focusedFillScript(observation.documentId, action.value ?? ""),
+        fill_item: targetFillScript(observation.documentId, action.target, action.value ?? "", observation.candidates.find(item => item.ref === action.target)?.field?.label || "observed text field"),
+        type_text: focusedFillScript(observation.documentId, action.value ?? "", observation.focusedField?.label || observation.focusedField?.placeholder || "focused field"),
         press_enter: `await page.keyboard.press("Enter"); return "pressed Enter"`,
         press_escape: `await page.keyboard.press("Escape"); return "pressed Escape"`,
         scroll_down: `await page.mouse.wheel(0, 650); return "scrolled down"`,
@@ -182,7 +184,7 @@ export function createBrowserBoundary(
       };
       const script = scripts[action.kind];
       if (!script) throw new Error(`Action ${action.kind} cannot be executed by the browser boundary`);
-      const documentGuard = observation.documentId ? `
+      const documentGuard = observation.documentId && action.kind !== "wait" ? `
         try {
           const observer = jevSession.observers?.get(page);
           if (!observer || jevSession.active !== page) throw new Error("Document changed");

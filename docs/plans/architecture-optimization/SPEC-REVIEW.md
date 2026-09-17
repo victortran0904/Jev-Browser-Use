@@ -1,3 +1,5 @@
+> Historical remote-branch review, superseded by REVIEW-SPEC-FINAL.md after the two-parent VPS reconciliation. Original findings retained for audit.
+
 # Review stage 1 — specification compliance
 
 Reviewer: the implementing assistant, in a separate manual review pass. The user explicitly waived subagents; this is not an independent-agent review. This file records findings, not a claim that every acceptance test passes.

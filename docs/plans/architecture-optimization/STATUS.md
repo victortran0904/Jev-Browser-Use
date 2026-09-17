@@ -1,65 +1,25 @@
-# Implementation status — 2026-09-17
+# Architecture implementation status — September 17, 2026
 
-Architecture changes are implemented on the isolated performance branch. Both requested review stages were performed as separate self-review passes, per the user's explicit waiver of subagents. See REVIEW-SPEC.md, REVIEW-QUALITY.md and TDD.md.
+The architecture code is implemented and tested on the requested Oracle VPS (`free`, Oracle Linux ARM64). Both divergent implementation histories are retained via a normal merge. No application change has been merged to `main`.
 
-Clean-install verification: npm ci PASS; popup patch idempotence PASS; 62 regression tests across 13 files PASS; typecheck PASS; production build PASS; all ten deterministic real-extension browsing workflows PASS. No application change is on main.
+The user explicitly waived subagents. TDD was followed, and specification review preceded a separate quality self-review. No independent-agent or Greptile approval is claimed. The former missing-Codex blocker no longer applies.
 
-The GitHub Actions run with repository-held model credentials and the exact public-flight prompt is the next verification stage. No live fare has been claimed from the synthetic flight fixture. The PR remains open and is not automatically merged.
+## Actual local acceptance
 
-## Historical work record (superseded where noted above)
+65 regression tests in 13 Vitest files: PASS. 22 additional Node checks: PASS. Typecheck/build: PASS. Six harness assertions: PASS. Ten canonical and ten additional merged browsing journeys: PASS through actual Chromium, extension and relay.
 
-# Current execution status
+Back recovery was observed RED at 8,112 ms and GREEN at 146 ms after replacing an absent-event wait with current document readiness. The final complete suite measured 209 ms. This is fixture evidence, not a universal website speedup.
 
-The user explicitly authorized direct implementation without subagents for this task on 2026-09-17, retaining TDD and two separate review stages (specification, then code quality). The earlier Codex-runtime blocker below is historical, no longer an implementation gate. Both reviews will be performed by the implementing assistant and reported as self-reviews, not independent agents. No merge is authorized by this adaptation.
+See TDD.md, RECONCILIATION.md, REVIEW-SPEC-FINAL.md and REVIEW-QUALITY-FINAL.md for progression, review findings and limits. Historical review files are not current approval of a different implementation.
 
-Current implementation base: `964b286bcd17020629e795a0df6a2a8d41029e01`.
-Work remains on `perf/browser-architecture-20260917` in the isolated worktree; PR #1 targets main.
+## Secret-backed VPS acceptance
 
-The original eight-task plan still defines scope. Preserve public BrowserBoundary and run APIs where practical. Add executable behavior in vertical RED/GREEN cycles, record real test outputs, and run regression/typecheck/build plus real-browser fixture tests. Extend the existing secret-safe Actions harness with the user's exact flight-search prompt. Credentials remain confined to GitHub Actions; no booking, purchase, or payment is permitted in the search test.
+A private, unique-label, one-job Actions runner lets GitHub inject `GEMINI_KEY` and `TYPESAFE_API_KEY` into only the live test steps on this VPS. Credentials are not extracted or printed. No persistent runner service is installed; its private work directory must be removed after completion.
 
-## Historical preparation record
+The job reruns deterministic acceptance before live-model journeys and the exact public-flight prompt. Results are recorded in PR #1 against the exact tested head; this file does not anticipate a pass. No real fare is inferred from a synthetic fixture. No booking or CAPTCHA bypass is allowed.
 
-# Execution status and baseline
+## Installation and remaining limits
 
-Status: BLOCKED before implementation. This branch currently changes documentation only.
+Run `npm ci`, reload the bundled Browser Control extension, and restart the relay before using this branch in an existing browser. Native-popup compatibility is pinned to Browser Control 0.7.1, idempotently patched and re-review-required on upgrade. No arbitrary user tab is attached.
 
-## Completed
-
-- Read the newly committed `skills/sdd/SKILL.md`, its implementer prompt, `skills/tdd/SKILL.md`, and all linked TDD reference files.
-- Created a fresh clone and an isolated worktree on `perf/browser-architecture-20260917` from `1398bd0bd3c1c327ad9140d92f7351798807511e`.
-- Confirmed the clean-tree precondition before any task preparation.
-- Wrote the eight-task architecture plan and the first XML implementer prompt.
-- Executed the unchanged baseline suite, typecheck, and production build successfully. Sanitized command output is in `BASELINE.txt`.
-
-## Baseline verification (2026-09-17)
-
-| Command | Outcome |
-| --- | --- |
-| `npm ci` | PASS; lockfile install, no tracked dependency changes |
-| `npm test` | PASS; 31 tests across 7 files |
-| `npm run typecheck` | PASS |
-| `npm run build` | PASS |
-| Tracked status after baseline | Clean |
-
-The frontend tests emit existing CSS matcher and missing canvas-context warnings but pass. These are baseline regression results, not tests of implemented optimizations. No live extension/browser-agent benchmark or model inference was run.
-
-## Blocking SDD precondition
-
-The only online Remote Desktop Commander device is the `free` Linux VPS. The user's Mac is not online through that connector. On the available runtime:
-
-- No `codex` or `claude` executable was found on PATH.
-- The documented `~/.claude/plugins/cache/openai-codex/codex/*/scripts/codex-companion.mjs` installation does not exist.
-- The skill's path-resolution preflight returned `Status: BLOCKED` with `Codex plugin not found or script missing. Install/reinstall openai-codex plugin.`
-- No alternate connected Codex implementation worker was found.
-
-The SDD skill explicitly forbids manual implementation edits by the controller and requires escalation when the companion is unavailable. Accordingly, no behavioral implementation or test changes have been made, and no worker or independent reviewer has been fabricated or substituted.
-
-Implementation dispatch count: **0**. Spec reviews: **NOT RUN**. Code-quality reviews: **NOT RUN**. RED/GREEN cycles: **NOT STARTED**. Greptile head review: **NOT RUN**; this preparatory PR is not merge-ready.
-
-The SDD skill also references `spec-reviewer-prompt.md` and `code-quality-reviewer-prompt.md`, which are not included beside the committed skill, and a machine-local Greptile skill. Locate those in the authorized worker environment before executing their respective review gates; do not invent completed reviews.
-
-## Resume prerequisite
-
-Make the configured Mac/Codex companion and reviewer runtime reachable, or provision the exact required companion/runtime on an authorized machine. Verify its authentication and documented model availability without printing credentials. Resume from this branch, inspect the clean tree, dispatch `TASK-1-PROMPT.xml` using the SDD command, and preserve per-task RED/GREEN and review evidence.
-
-Do not merge this draft or describe the architectural optimizations as implemented until the completion criteria in `PLAN.md` are actually satisfied.
+The observer remains lightweight rather than a complete iframe/shadow-root accessibility engine. Public-site and provider reliability are separate from deterministic architecture correctness. PR remains open; no automatic merge or external review score is claimed.

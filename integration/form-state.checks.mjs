@@ -22,7 +22,7 @@ test('multi-field forms expose safe current values even outside focused fields',
     await f.boundary.observe('test');
     await f.page.locator('input').first().evaluate(e=>e.value='HAN');
     const current=await f.boundary.observe('test');
-    assert(current.candidates.find(c=>c.label.includes('Origin')).label.includes('HAN'));
+    assert.equal(current.candidates.find(c=>c.label.includes('Origin')).field.value, 'HAN');
   }finally{await f.close();}
 });
 test('sensitive fields and mirrored metadata are redacted before observation',async()=>{
@@ -32,6 +32,6 @@ test('sensitive fields and mirrored metadata are redacted before observation',as
     const o=await f.boundary.observe('test');
     assert(!JSON.stringify(o).includes('fixture-private-value'));
     assert.equal(o.focusedField.isText,false);
-    assert(o.candidates.every(c=>!c.signature.includes('https:')));
+    assert(o.candidates.every(c=>!('signature' in c)));
   }finally{await f.close();}
 });

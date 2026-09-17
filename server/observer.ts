@@ -86,7 +86,7 @@ export function createObserver(documentId: string) {
             field?: FocusedField;
         }> = [];
         let examinedCandidates = 0;
-        for (const el of Array.from(matches)) {
+        for (const el of matches) {
             examinedCandidates += 1;
             if (!(el instanceof HTMLElement))
                 continue;

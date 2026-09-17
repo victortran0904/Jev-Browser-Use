@@ -1,5 +1,5 @@
 /** Action scripts retain an element handle instead of trusting mutable focus. */
-export function focusedFillScript(documentId: string | undefined, text: string): string {
+export function focusedFillScript(documentId: string | undefined, text: string, label = "focused field"): string {
   const input = JSON.stringify({ documentId, text });
   return `
     const input = ${input};
@@ -15,11 +15,11 @@ export function focusedFillScript(documentId: string | undefined, text: string):
     } finally {
       await handle.dispose();
     }
-    return "typed into focused field";
+    return ${JSON.stringify(`typed into ${label}`)};
   `;
 }
 
-export function targetFillScript(documentId: string | undefined, ref: string | undefined, text: string): string {
+export function targetFillScript(documentId: string | undefined, ref: string | undefined, text: string, label = "observed text field"): string {
   const input = JSON.stringify({ documentId, ref, text });
   return `
     const input = ${input};
@@ -35,6 +35,6 @@ export function targetFillScript(documentId: string | undefined, ref: string | u
     } finally {
       await handle.dispose();
     }
-    return "filled observed text field";
+    return ${JSON.stringify(`filled ${label}`)};
   `;
 }

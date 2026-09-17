@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createRelayTargetSource} from '../server/relay-targets.ts';
+import {createRelayTargetSource} from './relay-targets.ts';
 
 test('target provenance respects owning sessions and the actual target-list protocol',async()=>{
   const originalFetch=globalThis.fetch,OriginalWebSocket=globalThis.WebSocket;

@@ -82,3 +82,30 @@ describe("Jev planner", () => {
   });
 
 });
+
+it("offers only executable action kinds for an empty or non-editable viewport", async () => {
+  const captured: unknown[] = [];
+  const planner = createPlanner({ systemOne: async request => {
+    captured.push(request);
+    const answer = (choice: string) => ({ type: "choice" as const, choice, confidence: 1, probabilities: { [choice]: 1 } });
+    return { answers: { kind: answer("wait"), site: answer("no_site"), item: answer("no_item") } };
+  } });
+  await planner.plan({ goal: "Wait for search", history: [], observation: { id: "empty", url: "about:blank", title: "", snapshot: "", candidates: [] } });
+  const packet = captured[0] as { questions: { kind: { criteria: Record<string, string> } } };
+  expect(Object.keys(packet.questions.kind.criteria)).not.toEqual(expect.arrayContaining(["click_item"]));
+  for (const unavailable of ["click_item", "fill_item", "type_text", "press_enter"]) expect(packet.questions.kind.criteria).not.toHaveProperty(unavailable);
+  expect(packet.questions.kind.criteria).toHaveProperty("wait");
+});
+
+it("does not forward private field metadata to the external model", async () => {
+  let captured: unknown;
+  const planner = createPlanner({ systemOne: async request => {
+    captured = request;
+    const answer = (choice: string) => ({ type: "choice" as const, choice, confidence: 1, probabilities: { [choice]: 1 } });
+    return { answers: { kind: answer("wait"), site: answer("no_site"), item: answer("no_item") } };
+  } });
+  const field = { label: "Search", placeholder: "Query", value: "Hanoi", isText: true, signature: "PRIVATE_INTERNAL_TOKEN" };
+  await planner.plan({ goal: "Search", history: [], observation: { id: "private", url: "https://example.com", title: "", snapshot: "", pageText: "Current page", candidates: [], focusedField: field } });
+  expect(JSON.stringify(captured)).not.toContain("PRIVATE_INTERNAL_TOKEN");
+  expect(JSON.stringify(captured)).toContain("Hanoi");
+});

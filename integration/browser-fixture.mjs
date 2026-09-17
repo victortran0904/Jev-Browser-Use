@@ -39,7 +39,7 @@ export async function fixture(html, options = {}) {
     else await boundary.open('test','https://example.com/');
   } catch (error) { await browser.close(); throw error; }
   return { boundary, browser, requests, sessions,
-    get page() { return sessions.get('jev-test').state.__jevPage ?? sessions.get('jev-test').page; },
+    get page() { return sessions.get('jev-test').state.__jevBrowser?.active ?? sessions.get('jev-test').state.__jevPage ?? sessions.get('jev-test').page; },
     async close() { await boundary.close('test'); await browser.close(); },
   };
 }
