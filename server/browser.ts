@@ -1,4 +1,5 @@
 import { InvalidActionTargetError, StaleObservationError } from "./browser-errors.js";
+export { StaleObservationError } from "./browser-errors.js";
 import { focusedFillScript, targetFillScript } from "./browser-actions.js";
 import { sessionPrelude, sessionCleanup } from "./browser-session.js";
 import { observerSource } from "./observer.js";

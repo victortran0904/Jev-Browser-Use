@@ -12,7 +12,7 @@ jobs:
   oracle-free:
     if: github.repository == 'victortran0904/Jev-Browser-Use' && github.actor == 'victortran0904' && github.ref == 'refs/heads/perf/browser-architecture-20260917' && (github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[vps-verify]'))
     # Unique, non-default label on a one-job runner. Never route PR/fork jobs here.
-    runs-on: [jev-vps-acceptance-1789675412]
+    runs-on: [jev-final-acceptance-20260917-reconciled]
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803

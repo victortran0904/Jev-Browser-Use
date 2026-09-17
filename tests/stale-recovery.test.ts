@@ -23,7 +23,7 @@ it('reobserves a proven pre-dispatch popup transition and makes a new decision w
   await controller.settled(run.id);
   expect(run.status).toBe('complete');
   expect(counts()).toEqual({ observations: 2, actions: 1 });
-  expect(run.events.some(event => event.type === 'observation_invalidated')).toBe(true);
+  expect(run.events.some(event => event.type === 'state_refresh')).toBe(true);
 });
 
 it('never treats an ambiguous transport error mentioning stale state as safe to replay', async () => {
@@ -32,10 +32,10 @@ it('never treats an ambiguous transport error mentioning stale state as safe to 
   await controller.settled(run.id);
   expect(run.status).toBe('error');
   expect(counts()).toEqual({ observations: 1, actions: 1 });
-  expect(run.events.some(event => event.type === 'observation_invalidated')).toBe(false);
+  expect(run.events.some(event => event.type === 'state_refresh')).toBe(false);
 });
 
-it('keeps repeated safe re-observation within the existing twelve-decision limit', async () => {
+it('limits safe re-observation to two refreshes without expanding the twelve-decision limit', async () => {
   let actions = 0;
   const controller = createRunController({ enableScreenshots: false,
     browser: {
@@ -49,8 +49,9 @@ it('keeps repeated safe re-observation within the existing twelve-decision limit
   const run = controller.start({ goal: 'Show next page' });
   await controller.settled(run.id);
   expect(run.status).toBe('error');
-  expect(run.error).toMatch(/12-step/);
-  expect(actions).toBe(12);
+  expect(run.error).toMatch(/Stale/);
+  expect(actions).toBe(3);
+  expect(run.stepCount).toBeLessThanOrEqual(12);
 });
 
 it('asks for a fresh decision when the model selects an unavailable placeholder target', async () => {
@@ -69,5 +70,5 @@ it('asks for a fresh decision when the model selects an unavailable placeholder 
   await controller.settled(run.id);
   expect(run.status).toBe('complete');
   expect(observations).toBe(2);
-  expect(run.events.some(event => event.type === 'observation_invalidated')).toBe(true);
+  expect(run.events.some(event => event.type === 'state_refresh')).toBe(true);
 });

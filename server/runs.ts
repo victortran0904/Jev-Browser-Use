@@ -44,6 +44,7 @@ export function createRunController(deps: RunControllerOptions = {}) {
   async function loop(run: Run): Promise<void> {
     const history: string[] = [];
     let consecutiveNoops = 0;
+    let preDispatchRecoveries = 0;
     let lastResult = "";
     let lastState = "";
     try {
@@ -144,9 +145,10 @@ export function createRunController(deps: RunControllerOptions = {}) {
         } catch (error) {
           if (!(error instanceof StaleObservationError) && !(error instanceof InvalidActionTargetError)) throw error;
           if (run.stopped || run.status !== "running") return;
+          if (++preDispatchRecoveries > 2) throw error;
           history.push("Action rejected before dispatch; no action was sent. Observe again and select a valid current target.");
-          emit(run, "observation_invalidated", "Action rejected before dispatch; observing again", {
-            observationId: observation.id, kind: action.kind, dispatched: false,
+          emit(run, "state_refresh", "Action rejected before dispatch; observing again", {
+            observationId: observation.id, kind: action.kind, dispatched: false, attempt: preDispatchRecoveries, phase: "observe",
           });
           continue;
         }

@@ -125,3 +125,19 @@ it("sends observed readiness and consecutive-wait feedback without private readi
   expect(captured).toMatchObject({ state: { consecutive_waits: 2, page: { readiness: { documentState: "complete", busy: false } } } });
   expect(JSON.stringify(captured)).not.toContain("PRIVATE_READINESS");
 });
+
+
+it("provides control semantics to independently evaluated action questions", async () => {
+  const planner = createPlanner({ systemOne: async request => {
+    const { state } = request as { state: unknown };
+    // TypeSafe evaluates each question against shared state, not sibling criteria.
+    const seesControl = JSON.stringify(state).includes('Open destination');
+    const answer = (choice: string) => ({ type: "choice" as const, choice, confidence: 1, probabilities: { [choice]: 1 } });
+    return { answers: { kind: answer(seesControl ? "click_item" : "wait"), site: answer("no_site"), item: answer("e1") } };
+  } });
+  const action = await planner.plan({ goal: "Open the destination", history: [], observation: {
+    id: "independent", url: "https://example.com", title: "Navigation", pageText: "Choose your destination",
+    snapshot: 'link "Open destination" [ref=e1]', candidates: [{ ref: "e1", label: 'link "Open destination"' }],
+  } });
+  expect(action).toMatchObject({ kind: "click_item", target: "e1" });
+});
