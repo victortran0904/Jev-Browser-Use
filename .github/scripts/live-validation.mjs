@@ -1,3 +1,4 @@
+import { runPublicFlight, flightEvidence } from "./public-flight.mjs";
 // Verification only: imports the application unchanged; never prints API keys,
 // raw provider errors/responses, browser logs, page contents, or model prompts.
 import assert from "node:assert/strict";
@@ -15,12 +16,12 @@ import { createBrowserBoundary } from "../../server/browser.ts";
 import { createRunController } from "../../server/runs.ts";
 import { geminiModel, geminiFallbackModel } from "../../server/gemini.ts";
 
-const actionKinds = new Set(["open_site", "click_item", "type_text", "press_enter", "press_escape", "scroll_down", "scroll_up", "back", "wait", "done", "none"]);
+const actionKinds = new Set(["open_site", "click_item", "fill_item", "type_text", "press_enter", "press_escape", "scroll_down", "scroll_up", "back", "wait", "done", "none"]);
 const report = {
   schemaVersion: 1,
   runAttempt: Number(process.env.GITHUB_RUN_ATTEMPT || 1),
   commit: /^[a-f0-9]{40}$/.test(process.env.GITHUB_SHA || "") ? process.env.GITHUB_SHA : "local",
-  scope: "Unmodified application baseline; live API + real extension/local fixture; not an optimized-build comparison",
+  scope: "Architecture branch; live providers + real extension; controlled fixture and separate public flight exploration",
   tests: [], requests: [], browserTrace: [],
 };
 const safeName = (value) => /^[a-zA-Z0-9._/-]{1,100}$/.test(value || "") ? value : "unavailable";
@@ -69,7 +70,9 @@ if (process.argv.includes("--self-test")) {
   assert.equal(JSON.stringify(classify(new Error("unrecognized credential-do-not-copy"))).includes("credential-do-not-copy"), false);
   assert.equal(safeName("not a model?secret=value"), "unavailable");
   assert.equal(safeName("gemini-3.5-flash-lite"), "gemini-3.5-flash-lite");
-  console.log("PASS verification-harness-safety (4 assertions; no external requests)");
+  assert.equal(flightEvidence({ pageText: "No fare available" }).priceBelowLimitPresent, false);
+  assert.equal(flightEvidence({ pageText: "Hanoi to Vancouver December CAD 2200" }).priceBelowLimitPresent, true);
+  console.log("PASS verification-harness-safety (6 assertions; no external requests)");
   process.exit(0);
 }
 
@@ -86,7 +89,7 @@ globalThis.fetch = async (input, init) => {
     return originalFetch(input, init);
   }
   assert.equal(url.protocol, "https:");
-  if (++counts[provider] > (provider === "typesafe" ? 12 : 10)) throw new Error("Request budget exceeded");
+  if (++counts[provider] > (provider === "typesafe" ? 32 : 24)) throw new Error("Request budget exceeded");
   const started = performance.now();
   const record = { provider, number: counts[provider], model: safeName(url.pathname.match(/\/models\/([^:]+):/)?.[1] || (provider === "typesafe" ? "jev-latest" : "catalog")) };
   report.requests.push(record);
@@ -129,7 +132,7 @@ const watchdog = setTimeout(async () => {
   await saveReport();
   await cleanup();
   process.exit(1);
-}, 240_000);
+}, 420_000);
 
 try {
   const keysPresent = await check("repository-secrets-present", async () => {
@@ -203,7 +206,7 @@ try {
     const extension = path.resolve("node_modules/@opencode-ai/browser-control/extension/dist");
     browserProcess = spawn(chromium.executablePath(), [
       `--user-data-dir=${path.join(temp, "profile")}`, `--disable-extensions-except=${extension}`, `--load-extension=${extension}`,
-      "--no-first-run", "--no-default-browser-check", "--no-sandbox", "--disable-dev-shm-usage", "--ignore-certificate-errors", "--disable-background-networking", "about:blank",
+      "--no-first-run", "--disable-popup-blocking", "--no-default-browser-check", "--no-sandbox", "--disable-dev-shm-usage", "--ignore-certificate-errors", "--disable-background-networking", "about:blank",
     ], { env: childEnv, stdio: "ignore" });
     browserProcess.on("error", () => {});
     const deadline = Date.now() + 45_000;
@@ -290,6 +293,8 @@ try {
   });
   else skip("live-agent-end-to-end-local-search", "missing-secrets-or-browser-check-failed");
   if (!browserReady) skip("real-browser-navigation-observation-and-actions", "browser-startup-failed");
+  if (browserReady && keysPresent) await check("public-flight-exact-prompt", () => runPublicFlight({ boundary: createBrowserBoundary(), planner, writer, report }));
+  else skip("public-flight-exact-prompt", "missing-secrets-or-browser");
   report.requestCounts = counts;
 } catch (error) {
   report.tests.push({ name: "harness", status: "fail", ...classify(error) });

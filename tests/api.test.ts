@@ -13,3 +13,18 @@ describe("HTTP API", () => {
     expect(stopped.body.status).toBe("complete");
   });
 });
+
+it("rejects a screenshot request for a superseded observation", async () => {
+  const controller = createRunController({
+    enableScreenshots: true,
+    browser: {
+      begin: async () => {}, open: async () => "opened", act: async () => "acted",
+      observe: async () => ({ id: "current-observation", url: "https://example.com", title: "Example", snapshot: "", candidates: [] }),
+    },
+    planner: { plan: async () => ({ kind: "done", observationId: "current-observation", confidence: 1 }) },
+    narrator: { acknowledge: async () => "Starting", summarize: async () => "Finished" },
+  });
+  const run = controller.start({ goal: "Inspect page" });
+  await controller.settled(run.id);
+  await request(createApp(controller)).get(`/api/runs/${run.id}/screenshot?observationId=old-observation`).expect(409);
+});

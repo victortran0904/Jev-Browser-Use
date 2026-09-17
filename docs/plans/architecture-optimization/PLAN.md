@@ -1,16 +1,20 @@
 # Browser architecture optimization plan
 
-Status: BLOCKED before implementation (required SDD worker unavailable).
+Status: architecture implementation completed under the user-authorized direct-execution adaptation; final CI and public-site verification are tracked in STATUS.md. The original task breakdown below is retained as the implementation plan.
 Base: `1398bd0bd3c1c327ad9140d92f7351798807511e` (`main`).
 Branch: `perf/browser-architecture-20260917`.
 
 ## Goal and scope
 
-Implement the architecture optimizations approved in the repository review without a Rust rewrite, changing the UI, or weakening browser action safety. Improve end-to-end task completion, not just individual command throughput. This commit is planning only: none of the optimization tasks below has been implemented.
+Implement the architecture optimizations approved in the repository review without a Rust rewrite, changing the UI, or weakening browser action safety. Improve end-to-end task completion, not just individual command throughput. The original plan has now been implemented; actual verification and limitations are recorded in STATUS.md, TDD.md and the two review reports.
 
 The user explicitly requested an isolated branch/worktree, pushes to that branch, a PR to `main`, and use of `skills/sdd/SKILL.md` plus `skills/tdd/SKILL.md`.
 
-## Execution gates
+## User-authorized execution adaptation
+
+For this task the user explicitly waived subagents and required two review stages. Implementation and both reviews therefore ran directly, with the specification review preceding the code-quality review. The worker-only requirements in the original gates below are historical and superseded for this execution. No independent-agent or Greptile approval is claimed, and the PR is not automatically merged.
+
+## Original execution gates
 
 1. Start each task on a clean working tree in this worktree, never the user's existing checkout.
 2. Dispatch a fresh Codex implementer using the SDD companion and its XML prompt template. No controller implementation edits. Verify the documented model is actually available; do not silently substitute another model.
@@ -20,7 +24,7 @@ The user explicitly requested an isolated branch/worktree, pushes to that branch
 6. Run focused tests plus the complete existing test/typecheck/build gates before pushing each accepted task.
 7. Keep the PR draft until implementation and independent reviews exist. Apply the referenced Greptile gate when available; never claim a stale or missing review is approved. Do not merge this preparatory PR.
 
-There are no implementation dispatches or RED/GREEN cycles yet. Baseline regression tests are not TDD evidence.
+No subagent implementation dispatches were used under the waiver. TDD.md records actual RED/GREEN cycles; the original baseline alone is not implementation evidence.
 
 ## Public interface strategy
 

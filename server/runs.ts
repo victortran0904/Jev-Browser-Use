@@ -6,7 +6,7 @@ import { browserBoundary } from "./browser.js";
 import { planner as defaultPlanner } from "./planner.js";
 import { narrator as defaultNarrator, type Narrator } from "./narrator.js";
 import { SITES } from "./sites.js";
-import type { PlannedAction, Run, RunEvent } from "./types.js";
+import type { Observation, PlannedAction, Run, RunEvent } from "./types.js";
 import { extractExplicitUrl } from "./urls.js";
 import { writer as defaultWriter, type Writer } from "./writer.js";
 
@@ -47,15 +47,16 @@ export function createRunController(deps: RunControllerOptions = {}) {
     let lastState = "";
     try {
       while (run.stepCount < 12 && !run.stopped) {
-        const stepStart = Date.now();
-        const screenshotPath = enableScreenshots ? path.resolve(".runs", run.id, "screenshot.png") : undefined;
-        run.screenshotPath = screenshotPath;
+        const stepStart = performance.now();
+        const screenshotPath = enableScreenshots ? path.resolve(".runs", run.id, String(run.stepCount), "screenshot.png") : undefined;
 
-        const observeStart = Date.now();
-        const observation = await browser.observe(run.id, screenshotPath);
-        const observeMs = Date.now() - observeStart;
+        const observeStart = performance.now();
+        const initialUrl = run.stepCount === 0 ? extractExplicitUrl(run.goal) : null;
+        const observation: Observation = initialUrl ? { id: randomUUID(), url: "about:blank", title: "Neutral session", snapshot: "", pageText: "", candidates: [] } : await browser.observe(run.id, screenshotPath);
+        const observeMs = performance.now() - observeStart;
         if (run.stopped || run.status !== "running") return;
         run.observation = observation;
+        run.screenshotPath = initialUrl ? undefined : screenshotPath;
         emit(run, "observation", `Observed ${observation.title || observation.url || "page"}`, {
           observationId: observation.id,
           url: observation.url,
@@ -63,6 +64,8 @@ export function createRunController(deps: RunControllerOptions = {}) {
           screenshotUrl: observation.screenshotUrl,
           durationMs: observeMs,
           phase: "observe",
+          metrics: observation.metrics,
+          synthetic: Boolean(initialUrl),
         });
 
         // Optimization 4: Parse explicit URLs directly without a model call
@@ -88,9 +91,9 @@ export function createRunController(deps: RunControllerOptions = {}) {
             phase: "plan",
           });
         } else {
-          const planStart = Date.now();
+          const planStart = performance.now();
           action = await planner.plan({ goal: run.goal, history, observation });
-          planMs = Date.now() - planStart;
+          planMs = performance.now() - planStart;
           if (run.stopped || run.status !== "running") return;
           run.stepCount += 1;
           emit(run, "plan", `Jev chose ${action.kind}`, {
@@ -111,17 +114,25 @@ export function createRunController(deps: RunControllerOptions = {}) {
           }
         }
 
-        const actStart = Date.now();
+        const actStart = performance.now();
+        let writerMs = 0;
+        const timeWriter = async <T>(work: () => Promise<T>): Promise<T> => {
+          const start = performance.now();
+          try { return await work(); } finally { writerMs += performance.now() - start; }
+        };
         let result: string;
         if (action.kind === "open_site") {
           const knownUrl = action.site ? SITES[action.site] : "";
           const explicitUrl = extractExplicitUrl(run.goal);
-          const url = action.url || knownUrl || (action.site === "other" ? (explicitUrl ?? await writer.generateUrl({ goal: run.goal, history })) : explicitUrl);
+          const url = action.url || knownUrl || (action.site === "other" ? (explicitUrl ?? await timeWriter(() => writer.generateUrl({ goal: run.goal, history }))) : explicitUrl);
+          if (run.stopped || run.status !== "running") return;
           result = url ? await browser.open(run.id, url) : "open_site refused: no catalog site matched and the writer supplied no valid URL";
-        } else if (action.kind === "type_text") {
-          if (!observation.focusedField?.isText) result = "type_text refused: no browser text field is focused";
+        } else if (action.kind === "type_text" || action.kind === "fill_item") {
+          const field = action.kind === "fill_item" ? observation.candidates.find(item => item.ref === action.target)?.field : observation.focusedField;
+          if (!field?.isText || field.sensitive) result = "type_text refused: no browser text field is focused";
           else {
-            const generated = await writer.generateText({ goal: run.goal, history, observation });
+            const generated = await timeWriter(() => writer.generateText({ goal: run.goal, history, observation: { ...observation, focusedField: field } }));
+            if (run.stopped || run.status !== "running") return;
             if (!generated.fill || !generated.text) result = `type_text refused: ${generated.reason || "writer declined"}`;
             else result = await browser.act(run.id, { ...action, value: generated.text }, observation);
           }
@@ -129,14 +140,17 @@ export function createRunController(deps: RunControllerOptions = {}) {
           result = await browser.act(run.id, action, observation);
         }
 
-        const actMs = Date.now() - actStart;
-        const totalStepMs = Date.now() - stepStart;
-        run.timings = { observeMs, planMs, actMs, totalMs: totalStepMs };
+        if (run.stopped || run.status !== "running") return;
+        const actMs = performance.now() - actStart;
+        const browserMs = Math.max(0, actMs - writerMs);
+        const totalStepMs = performance.now() - stepStart;
+        run.timings = { observeMs, planMs, actMs, writerMs, browserMs, totalMs: totalStepMs };
 
         history.push(result);
         emit(run, "action", result, {
           action,
           durationMs: actMs,
+          writerMs, browserMs,
           phase: "act",
           stepDurationMs: totalStepMs,
         });

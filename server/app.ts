@@ -24,7 +24,11 @@ export function createApp(controller: RunController = defaultRuns) {
   });
   app.post("/api/runs/:id/stop", (req, res, next) => { try { res.json(controller.stop(req.params.id)); } catch (error) { next(error); } });
   app.get("/api/runs/:id/screenshot", (req, res) => {
-    const file = controller.get(req.params.id)?.screenshotPath;
+    const run = controller.get(req.params.id);
+    if (!run) return res.status(404).json({ error: "Run not found" });
+    if (req.query.observationId && req.query.observationId !== run.observation?.id) return res.status(409).json({ error: "Stale screenshot observation" });
+    const file = run.screenshotPath;
+    res.setHeader("Cache-Control", "no-store");
     if (!file || !existsSync(file)) return res.status(404).json({ error: "No screenshot yet" });
     res.sendFile(file);
   });

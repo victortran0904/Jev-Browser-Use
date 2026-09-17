@@ -49,7 +49,7 @@ export function createWriter(): Writer {
           previous_actions: input.history.slice(-8),
           page: { url: input.observation.url, title: input.observation.title },
           focused_field: input.observation.focusedField,
-          page_text: input.observation.snapshot.slice(0, 12_000),
+          page_text: (input.observation.pageText ?? input.observation.snapshot).slice(0, 12_000),
         },
       );
       return { fill: Boolean(answer.fill), text: String(answer.text ?? "").trim(), reason: String(answer.reason ?? "") };

@@ -10,6 +10,7 @@ function kindCriteria(observation: Observation) {
   return {
     open_site: "Navigate to a website. This is the only way to reach a specific site; do not use a page search field as an address bar.",
     click_item: "Activate one current on-screen item selected by the item question.",
+    fill_item: "Fill one currently observed editable text field selected by the item question. Prefer this to a separate click and type cycle. Does not submit the form. Only use items marked editable.",
     type_text: observation.focusedField?.isText
       ? `Type useful free text into the focused field ${JSON.stringify(observation.focusedField.label || observation.focusedField.placeholder)}.`
       : "Only valid when a browser text field is already focused; no text field is currently focused.",
@@ -27,7 +28,7 @@ function kindCriteria(observation: Observation) {
 export function createPlanner(client?: JevLike): { plan(input: PlanInput): Promise<PlannedAction> } {
   return {
     async plan(input) {
-      const itemCriteria: Record<string, string> = Object.fromEntries(input.observation.candidates.map((item) => [item.ref, item.label]));
+      const itemCriteria: Record<string, string> = Object.fromEntries(input.observation.candidates.map((item) => [item.ref, item.label + (item.field ? ` [editable=${item.field.isText}, value=${JSON.stringify(item.field.value.slice(0, 120))}]` : "")]));
       if (Object.keys(itemCriteria).length < 2) Object.assign(itemCriteria, { no_item: "No on-screen item applies", unavailable: "No second item is available" });
       const siteCriteria = {
         ...Object.fromEntries(Object.entries(SITES).map(([name, url]) => [name, `${name.replaceAll("_", " ")} (${url})`])),
@@ -45,14 +46,14 @@ export function createPlanner(client?: JevLike): { plan(input: PlanInput): Promi
               url: input.observation.url,
               title: input.observation.title,
               focused_field: input.observation.focusedField ? { ...input.observation.focusedField } : null,
-              semantic_dom: input.observation.snapshot,
+              semantic_dom: input.observation.pageText ?? input.observation.snapshot,
             },
             previous_action_results: input.history.slice(-8),
           },
           questions: {
             kind: choice("Which single action kind makes the most progress toward the goal right now?", kindCriteria(input.observation)),
             site: choice("If a website must be opened now, which catalog entry applies?", siteCriteria),
-            item: choice("If clicking an on-screen item is the right action, which current item should be activated?", itemCriteria),
+            item: choice("If clicking or filling an on-screen item is the right action, which current item should be used?", itemCriteria),
           },
         });
       } catch (error) {
@@ -60,7 +61,7 @@ export function createPlanner(client?: JevLike): { plan(input: PlanInput): Promi
       }
 
       const { kind, site, item } = result.answers;
-      const clicking = kind.choice === "click_item";
+      const clicking = kind.choice === "click_item" || kind.choice === "fill_item";
       const action: PlannedAction = {
         kind: kind.choice as PlannedAction["kind"],
         observationId: input.observation.id,

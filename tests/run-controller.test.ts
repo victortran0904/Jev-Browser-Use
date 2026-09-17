@@ -166,4 +166,65 @@ describe("run controller", () => {
     expect(serialized).not.toContain("PRIVATE_URL_SECRET");
     expect(serialized).toContain("https://example.com/final");
   });
+  it("does not type when Stop happens while the writer is still generating text", async () => {
+    let release!: (value: { fill: boolean; text: string; reason: string }) => void;
+    let acted = false;
+    const controller = createRunController({
+      browser: makeBrowser({ observe: async () => ({ ...observation, focusedField: { label: "Search", placeholder: "", value: "", isText: true } }), act: async () => { acted = true; return "typed"; } }),
+      planner: { plan: async () => ({ kind: "type_text", observationId: observation.id, confidence: 1 }) },
+      writer: { generateUrl: async () => "", generateText: async () => new Promise(resolve => { release = resolve; }) },
+      narrator: { acknowledge: async () => "Starting", summarize: async () => "Stopped" },
+    });
+    const run = controller.start({ goal: "Search" });
+    await expect.poll(() => typeof release).toBe("function");
+    controller.stop(run.id);
+    release({ fill: true, text: "query", reason: "" });
+    await controller.settled(run.id);
+    expect(acted).toBe(false);
+    expect(run.events.filter(event => event.type === "action")).toHaveLength(0);
+  });
+
+  it("fills a selected observed field directly with text generated for that field", async () => {
+    const actions: unknown[] = []; let plans = 0; let writerLabel = "";
+    const field = { label: "Destination", placeholder: "Destination", value: "", isText: true };
+    const current = { ...observation, candidates: [{ ref: "e2", label: 'textbox "Destination"', field }] };
+    const controller = createRunController({
+      browser: makeBrowser({ observe: async () => current, act: async (_id, action) => { actions.push(action); return "filled observed text field"; } }),
+      planner: { plan: async () => ++plans === 1 ? { kind: "fill_item", target: "e2", observationId: current.id, confidence: 1 } : { kind: "done", observationId: current.id, confidence: 1 } },
+      writer: { generateUrl: async () => "", generateText: async input => { writerLabel = input.observation.focusedField?.label ?? ""; return { fill: true, text: "YVR", reason: "" }; } },
+      narrator: { acknowledge: async () => "Starting", summarize: async () => "Finished" },
+    });
+    const run = controller.start({ goal: "Find a flight to Vancouver" }); await controller.settled(run.id);
+    expect(writerLabel).toBe("Destination");
+    expect(actions).toEqual([expect.objectContaining({ kind: "fill_item", target: "e2", value: "YVR" })]);
+  });
+
+  it("reports writer latency separately from browser action latency", async () => {
+    let plans = 0;
+    const controller = createRunController({
+      browser: makeBrowser({ observe: async () => ({ ...observation, focusedField: { label: "Search", placeholder: "", value: "", isText: true } }) }),
+      planner: { plan: async () => ({ kind: ++plans === 1 ? "type_text" : "done", observationId: observation.id, confidence: 1 }) },
+      writer: { generateUrl: async () => "", generateText: async () => { await new Promise(resolve => setTimeout(resolve, 30)); return { fill: true, text: "query", reason: "" }; } },
+      narrator: { acknowledge: async () => "Starting", summarize: async () => "Finished" },
+    });
+    const run = controller.start({ goal: "Search" }); await controller.settled(run.id);
+    const action = run.events.find(event => event.type === "action")!;
+    expect(action.data?.writerMs).toBeGreaterThanOrEqual(20);
+    expect(action.data?.browserMs).toBeGreaterThanOrEqual(0);
+    expect(run.timings?.writerMs).toBe(action.data?.writerMs);
+  });
+
+  it("opens an explicit initial URL before requesting a costly browser observation", async () => {
+    let opened = false;
+    const controller = createRunController({
+      browser: makeBrowser({ open: async () => { opened = true; return "opened"; }, observe: async () => { if (!opened) throw new Error("Blank page was unnecessarily scanned"); return observation; } }),
+      planner: { plan: async () => ({ kind: "done", observationId: observation.id, confidence: 1 }) },
+      narrator: { acknowledge: async () => "Starting", summarize: async () => "Finished" },
+    });
+    const run = controller.start({ goal: "Visit https://example.com" }); await controller.settled(run.id);
+    expect(run.status).toBe("complete");
+    expect(opened).toBe(true);
+    expect(run.events.find(event => event.type === "observation")?.data?.synthetic).toBe(true);
+  });
+
 });

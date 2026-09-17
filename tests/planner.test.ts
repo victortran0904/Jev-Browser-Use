@@ -47,4 +47,38 @@ describe("Jev planner", () => {
     expect(request).toContain("protection");
     expect(request).toContain("instead of done");
   });
+  it("sends a self-contained page context without repeating candidate labels", async () => {
+    let packet: unknown;
+    const planner = createPlanner({ systemOne: async request => {
+      packet = request;
+      const answer = (choice: string) => ({ type: "choice" as const, choice, confidence: 1, probabilities: { [choice]: 1 } });
+      return { answers: { kind: answer("click_item"), site: answer("no_site"), item: answer("e1") } };
+    } });
+    await planner.plan({ goal: "Show details", history: [], observation: {
+      id: "compact", url: "https://example.com", title: "Example", pageText: "Main result state",
+      snapshot: 'button "UNIQUE_BUTTON_LABEL" [ref=e1]\nMain result state',
+      candidates: [{ ref: "e1", label: 'button "UNIQUE_BUTTON_LABEL"' }, { ref: "e2", label: 'button "Cancel"' }],
+    } });
+    const json = JSON.stringify(packet);
+    expect(json.match(/UNIQUE_BUTTON_LABEL/g)).toHaveLength(1);
+    expect(json).toContain("Main result state");
+  });
+
+  it("binds a direct-fill choice to the selected item and its confidence", async () => {
+    let packet: unknown;
+    const planner = createPlanner({ systemOne: async request => {
+      packet = request;
+      const answer = (choice: string, confidence = 1) => ({ type: "choice" as const, choice, confidence, probabilities: { [choice]: confidence } });
+      return { answers: { kind: answer("fill_item", 0.9), site: answer("no_site"), item: answer("e1", 0.8) } };
+    } });
+    const action = await planner.plan({ goal: "Enter destination", history: [], observation: {
+      id: "fill", url: "https://example.com", title: "Example", pageText: "Flight search", snapshot: "", candidates: [
+        { ref: "e1", label: 'textbox "Destination"', field: { label: "Destination", placeholder: "", value: "", isText: true } },
+        { ref: "e2", label: 'button "Search"' },
+      ],
+    } });
+    expect(action).toMatchObject({ kind: "fill_item", target: "e1", confidence: 0.8 });
+    expect(JSON.stringify(packet)).toContain("fill_item");
+  });
+
 });

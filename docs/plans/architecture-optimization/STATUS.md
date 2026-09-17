@@ -1,3 +1,13 @@
+# Implementation status — 2026-09-17
+
+Architecture changes are implemented on the isolated performance branch. Both requested review stages were performed as separate self-review passes, per the user's explicit waiver of subagents. See REVIEW-SPEC.md, REVIEW-QUALITY.md and TDD.md.
+
+Clean-install verification: npm ci PASS; popup patch idempotence PASS; 62 regression tests across 13 files PASS; typecheck PASS; production build PASS; all ten deterministic real-extension browsing workflows PASS. No application change is on main.
+
+The GitHub Actions run with repository-held model credentials and the exact public-flight prompt is the next verification stage. No live fare has been claimed from the synthetic flight fixture. The PR remains open and is not automatically merged.
+
+## Historical work record (superseded where noted above)
+
 # Current execution status
 
 The user explicitly authorized direct implementation without subagents for this task on 2026-09-17, retaining TDD and two separate review stages (specification, then code quality). The earlier Codex-runtime blocker below is historical, no longer an implementation gate. Both reviews will be performed by the implementing assistant and reported as self-reviews, not independent agents. No merge is authorized by this adaptation.

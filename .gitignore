@@ -6,3 +6,6 @@ dist-server/
 *.log
 *.tsbuildinfo
 *.mp4
+
+# Local browser and verification output
+.ci-results/
