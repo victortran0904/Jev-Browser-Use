@@ -24,7 +24,9 @@ jobs:
           test "$(hostname -s)" = free
           node --input-type=module -e 'if (Number(process.versions.node.split(".")[0]) !== 22) throw Error("Expected provisioned Node 22"); console.log("Oracle Linux ARM64; Node " + process.versions.node)'
       - run: npm ci
-      - run: npm test -- --maxWorkers=2
+      # Avoid concurrent Chromium startup contention on the shared Oracle VPS.
+      # Keep application assertions and explicit performance thresholds unchanged.
+      - run: npm test -- --maxWorkers=1
       - run: node --import tsx --test --test-concurrency=1 integration/*.checks.mjs
       - run: npm run typecheck
       - run: npm run build

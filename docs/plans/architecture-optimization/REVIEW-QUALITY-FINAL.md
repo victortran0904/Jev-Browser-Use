@@ -22,3 +22,7 @@ Performed by the implementing assistant after the separate specification review.
 ## Known limits
 
 Field sensitivity detection is heuristic, not universal PII detection. Rich iframe/shadow-root extraction is not added. The patch requires extension reload and relay restart in an existing installation and re-review on dependency upgrade. Exact-head provider and public-flight outcomes are recorded in the PR; a CAPTCHA, model failure or missing dated fare remains a failed exploration. No automatic merge or external review score is claimed.
+
+## First exact-head Actions attempt
+
+Oracle run 35270000518 stopped at regression: 59/65 passed, with concurrent browser startup/test timeouts and a timing threshold failure. No provider secrets were used. The follow-up schedules Vitest with one worker on this shared VPS only; no test is removed and no explicit timing/assertion threshold is relaxed. The same exact clean checkout passed all 65 tests with one worker, with the 800 ms focus and 1,200 ms navigation thresholds unchanged. Both review stages accept this scheduling-only change; the original failed run remains visible. This is a harness scheduling adjustment, not a claimed application RED/GREEN fix.

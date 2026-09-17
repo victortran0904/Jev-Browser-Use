@@ -21,3 +21,7 @@ Direct fill is implemented; arbitrary compound submission is intentionally exclu
 The exact flight prompt is preserved. Acceptance separately assumes December 2026 and CAD; those assumptions are not attributed to the ambiguous user text. Public testing requires dated itinerary evidence and permits no booking or CAPTCHA bypass. Live provider/public-site results must be reported from the exact Actions run, not inferred from fixture success.
 
 Status: local architecture specification checks passed with these documented limits. External acceptance remains separately reported.
+
+## First exact-head Actions attempt
+
+Oracle run 35270000518 stopped at regression: 59/65 passed, with concurrent browser startup/test timeouts and a timing threshold failure. No provider secrets were used. The follow-up schedules Vitest with one worker on this shared VPS only; no test is removed and no explicit timing/assertion threshold is relaxed. The same exact clean checkout passed all 65 tests with one worker, with the 800 ms focus and 1,200 ms navigation thresholds unchanged. Both review stages accept this scheduling-only change; the original failed run remains visible. This is a harness scheduling adjustment, not a claimed application RED/GREEN fix.
