@@ -46,14 +46,14 @@ export function createRelayTargetSource(endpoint = process.env.BROWSER_CONTROL_E
   return {
     async snapshot() {
       const epoch = generation;
-      const response = await fetch(`${endpoint}/extension/status`, { signal: AbortSignal.timeout(2000) });
-      if (!response.ok) throw new Error('Relay target status unavailable');
+      const response = await fetch(`${endpoint}/json/list`, { signal: AbortSignal.timeout(2000) });
+      if (!response.ok) throw new Error('Relay target list unavailable');
       const status = await response.json();
-      const targets = (status.targets ?? []).filter((t: StatusTarget) => t.owner === 'relay' && t.browserControlSessionId) as StatusTarget[];
+      if (!Array.isArray(status)) throw new Error('Invalid relay target list');
+      const targets = status.filter((t: StatusTarget) => t.owner === 'relay' && t.browserControlSessionId) as StatusTarget[];
       for (const id of cache.keys()) if (!targets.some(t => t.id === id)) cache.delete(id);
       const result: RelayTarget[] = [];
-      // Only new targets need a scoped metadata request. Steady-state snapshots
-      // reuse immutable opener identity and make one lightweight status read.
+      // New targets require scoped metadata. Known opener identity is immutable.
       for (const target of targets) {
         let value = cache.get(target.id);
         if (value?.session !== target.browserControlSessionId) value = undefined;
