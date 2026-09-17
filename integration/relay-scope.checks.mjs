@@ -2,10 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createRelayTargetSource} from '../server/relay-targets.ts';
 
-test('target provenance respects the owning session scope',async()=>{
+test('target provenance respects owning sessions and the actual target-list protocol',async()=>{
   const originalFetch=globalThis.fetch,OriginalWebSocket=globalThis.WebSocket;
   const targets=[{id:'root',owner:'relay',browserControlSessionId:'root-session'},{id:'child',owner:'relay',browserControlSessionId:'child-session'}];
-  globalThis.fetch=async url=>Response.json(String(url).endsWith('/json/version')?{webSocketDebuggerUrl:'ws://127.0.0.1:19989/devtools/browser/local'}:{targets});
+  globalThis.fetch=async url=>Response.json(String(url).endsWith('/json/version')?{webSocketDebuggerUrl:'ws://127.0.0.1:19989/devtools/browser/local'}:String(url).endsWith('/json/list')?targets:{connected:true,activeTargets:targets.length});
   globalThis.WebSocket=class extends EventTarget {
     static OPEN=1;readyState=0;
     constructor(url){super();this.url=new URL(url);queueMicrotask(()=>{this.readyState=1;this.dispatchEvent(new Event('open'));});}
