@@ -1,4 +1,4 @@
-// Verification only: imports the application unchanged; never prints API keys,
+// Verification only: imports the current application; never prints API keys,
 // raw provider errors/responses, browser logs, page contents, or model prompts.
 import assert from "node:assert/strict";
 import { spawn, execFileSync } from "node:child_process";
@@ -20,7 +20,7 @@ const report = {
   schemaVersion: 1,
   runAttempt: Number(process.env.GITHUB_RUN_ATTEMPT || 1),
   commit: /^[a-f0-9]{40}$/.test(process.env.GITHUB_SHA || "") ? process.env.GITHUB_SHA : "local",
-  scope: "Unmodified application baseline; live API + real extension/local fixture; not an optimized-build comparison",
+  scope: "Architecture candidate; live API + real extension/local fixture; not a controlled before/after comparison",
   tests: [], requests: [], browserTrace: [],
 };
 const safeName = (value) => /^[a-zA-Z0-9._/-]{1,100}$/.test(value || "") ? value : "unavailable";

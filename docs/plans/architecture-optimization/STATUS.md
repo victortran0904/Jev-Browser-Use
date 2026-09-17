@@ -1,3 +1,5 @@
+> Historical preparation record. Current implementation status is in PROGRESS.md; the subagent prerequisite was waived by the user.
+
 # Current execution status
 
 The user explicitly authorized direct implementation without subagents for this task on 2026-09-17, retaining TDD and two separate review stages (specification, then code quality). The earlier Codex-runtime blocker below is historical, no longer an implementation gate. Both reviews will be performed by the implementing assistant and reported as self-reviews, not independent agents. No merge is authorized by this adaptation.
