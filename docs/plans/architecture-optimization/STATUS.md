@@ -23,3 +23,7 @@ The job reruns deterministic acceptance before live-model journeys and the exact
 Run `npm ci`, reload the bundled Browser Control extension, and restart the relay before using this branch in an existing browser. Native-popup compatibility is pinned to Browser Control 0.7.1, idempotently patched and re-review-required on upgrade. No arbitrary user tab is attached.
 
 The observer remains lightweight rather than a complete iframe/shadow-root accessibility engine. Public-site and provider reliability are separate from deterministic architecture correctness. PR remains open; no automatic merge or external review score is claimed.
+
+## Final hardening follow-through
+
+`FINAL-HARDENING.md` records four additional genuine RED/GREEN safety fixes (redaction boundaries/overlap and stale form click/Enter), five added regression tests, and a separate specification then quality self-review. Current local regression totals are 70 Vitest tests in 15 files and 24 Node checks; typecheck, build and six harness assertions passed. Exact-head native-relay and secret-backed results are reported separately in PR #1; earlier failed CI attempts remain visible. No independent reviewer or Greptile score is claimed.
