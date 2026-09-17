@@ -49,14 +49,29 @@ export function createObserver(documentId: string) {
     const invalidationEvents = ["scroll", "resize", "load", "pageshow", "hashchange", "popstate"];
     for (const event of invalidationEvents)
         window.addEventListener(event, invalidate, true);
+    const activeModal = () => {
+        const visible = Array.from(document.querySelectorAll<HTMLElement>('dialog:modal,[role="dialog"][aria-modal="true"]')).filter(el => {
+            const rect = el.getBoundingClientRect();
+            const style = getComputedStyle(el);
+            return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden"
+                && !el.closest('[hidden],[inert],[aria-hidden="true"]');
+        });
+        visible.reverse();
+        return visible.find(el => el.contains(document.activeElement)) ?? visible[0];
+    };
+    const inActiveScope = (element: Element) => {
+        const modal = activeModal();
+        return (!modal || modal.contains(element)) && !element.closest('[inert],[aria-hidden="true"]');
+    };
     function collectObservation() {
         const started = performance.now();
+        const modal = activeModal();
         currentElements.clear();
         signatures.clear();
         const sensitiveValues = Array.from(document.querySelectorAll("input,textarea,[contenteditable=true]"))
             .filter(isSensitive).map(fieldValue).filter(Boolean).sort((a, b) => b.length - a.length);
         const redact = (text: string) => sensitiveValues.reduce((value, secret) => value.split(secret).join("[redacted]"), text);
-        const selector = "a,button,input,textarea,select,[role=option],[role=button],[role=link],[role=textbox],[role=searchbox],[contenteditable=true]";
+        const selector = "a,button,input,textarea,select,[role=combobox],[role=option],[role=button],[role=link],[role=textbox],[role=searchbox],[contenteditable=true]";
         queueChanges(mutations.takeRecords());
         const changes = pendingChanges;
         pendingChanges = [];
@@ -96,6 +111,8 @@ export function createObserver(documentId: string) {
         for (const el of matches) {
             examinedCandidates += 1;
             if (!(el instanceof HTMLElement))
+                continue;
+            if ((modal && !modal.contains(el)) || el.closest('[inert],[aria-hidden="true"]'))
                 continue;
             const rect = el.getBoundingClientRect();
             if (rect.width <= 0 || rect.height <= 0 || rect.right < 0 || rect.left > innerWidth || rect.bottom < 0 || rect.top > innerHeight)
@@ -151,7 +168,7 @@ export function createObserver(documentId: string) {
             }
             return parts.join("\n");
         };
-        const sections: string[] = [];
+        const sections: string[] = modal ? ["Dialog: " + redact(modal.getAttribute("aria-label") || "").slice(0, 220)] : [];
         const priority = Array.from(document.querySelectorAll("dialog[open],[role=dialog],[role=status],[role=alert],[aria-live=polite],[aria-live=assertive]"));
         for (const root of priority.slice(0, 8))
             sections.push(readText(root, 1500));
@@ -177,7 +194,7 @@ export function createObserver(documentId: string) {
         },
         resolveFill(ref: string, expectedDocumentId: string) {
             const element = currentElements.get(ref);
-            if (expectedDocumentId !== documentId || !element?.isConnected || signatures.get(ref) !== signature(element) || isSensitive(element))
+            if (expectedDocumentId !== documentId || !element?.isConnected || !inActiveScope(element) || signatures.get(ref) !== signature(element) || isSensitive(element))
                 throw new Error("Stale or sensitive text field");
             const allowed = element instanceof HTMLTextAreaElement || element.isContentEditable
                 || element instanceof HTMLInputElement && ["text", "search", "email", "url", "tel", "number", "date", "datetime-local", "month", "week", "time"].includes(element.type);
@@ -192,7 +209,7 @@ export function createObserver(documentId: string) {
         },
         resolveFocus(expectedDocumentId: string) {
             const element = observedFocus;
-            if (expectedDocumentId !== documentId || !element?.isConnected || document.activeElement !== element
+            if (expectedDocumentId !== documentId || !element?.isConnected || !inActiveScope(element) || document.activeElement !== element
                 || isSensitive(element) || fieldValue(element) !== observedFocusValue
                 || !(element instanceof HTMLElement) || signature(element) !== observedFocusSignature)
                 throw new Error("Stale or sensitive focused field; observe again");
@@ -200,7 +217,7 @@ export function createObserver(documentId: string) {
         },
         resolve(ref: string, expectedDocumentId: string) {
             const element = currentElements.get(ref);
-            if (expectedDocumentId !== documentId || !element?.isConnected || signatures.get(ref) !== signature(element))
+            if (expectedDocumentId !== documentId || !element?.isConnected || !inActiveScope(element) || signatures.get(ref) !== signature(element))
                 throw new Error("Stale browser target; observe again");
             return element;
         },

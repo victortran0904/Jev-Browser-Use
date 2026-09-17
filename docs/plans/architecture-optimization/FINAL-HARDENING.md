@@ -90,3 +90,19 @@ For overlapping recovery changes, the merged implementation uses the private str
 Specification review of the reconciliation: reviewed both parent diffs and approved preservation of shared model controls, strict recovery bounds, no action replay, duplicate-fill suppression and original flight checks. Quality review followed: verified a single error-class identity across both import paths, consistent structured-result detection, no unresolved conflict markers, no double event emission and unchanged disposal/stop semantics. All 19 focused tests from both histories and typechecking passed after conflict resolution. Final complete verification and exact-head live outcomes remain separate gates. Both reviews are self-reviews, not independent-agent approval.
 
 Final merged local verification on Oracle VPS completed with exit 0: **84 Vitest tests in 20 files**, **26 Node integration checks**, typechecking, production build, and six harness-safety assertions. No browser thresholds, live provider budgets or flight evidence requirements were relaxed. The next exact-head Actions run uses its own uniquely labelled one-job runner directory to avoid session collisions; secret scoping and repository/branch/actor restrictions are unchanged.
+
+## Autocomplete coverage and public-test diagnostics
+
+Exact-head run `35276684957` at `c2433d8` passed all deterministic gates and **10/10 live-model journeys**. The public task still exhausted its eight-call writer budget; all nine TypeSafe and eight Gemini requests returned HTTP 200. No matching fare was verified. This is preserved as a failed public-task result, not an authentication or provider outage.
+
+A new real-browser test was observed RED because the visible `role=option` airport suggestion was absent from candidates. The minimal selector addition made it GREEN: the suggestion is selected through normal browser input, the origin updates to HAN, and hidden suggestions remain excluded. This was implemented and tested in the isolated review worktree without overwriting separate uncommitted work in the original checkout.
+
+A public-report test was separately observed RED for missing safe option/target diagnostics, then GREEN after adding candidate indices and option/field counts. An incorrect fixture-helper call was caught by that same test and corrected before GREEN. The reporting packet was formatted only after GREEN. No raw field values or errors were added to reports.
+
+### Specification review
+
+Reviewed the original navigation/observation goals, new autocomplete test and public acceptance safeguards. Visible ARIA options now use the same bounded collection, private stable references, freshness validation and browser actionability as other controls. Hidden suggestions are excluded; no synthetic click or forced submission is introduced. The exact flight prompt, provider call limits, no-booking policy and explicit dated-CAD evidence check are unchanged. Specification self-review accepted for this bounded coverage fix, pending full verification.
+
+### Subsequent code-quality review
+
+Reviewed the actual one-line collector change and diagnostic packet after specification review. Candidate limits and cache invalidation remain intact. Diagnostics contain only safe counts/indices and existing static categories; no new API, dependency, page privilege, external request or secret handling is introduced. The public diagnostic test still verifies low-confidence classification and absence of a raw error field. Quality self-review accepted pending complete-suite and exact-head live results. Neither pass is an independent-agent review.

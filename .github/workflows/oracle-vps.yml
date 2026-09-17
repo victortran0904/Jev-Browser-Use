@@ -3,6 +3,12 @@ on:
   push:
     branches: [perf/browser-architecture-20260917]
   workflow_dispatch:
+    inputs:
+      scope:
+        description: Verification scope (full is required for final acceptance)
+        type: choice
+        options: [full, public-flight]
+        default: full
 permissions:
   contents: read
 concurrency:
@@ -26,16 +32,23 @@ jobs:
       - run: npm ci
       # Avoid concurrent Chromium startup contention on the shared Oracle VPS.
       # Keep application assertions and explicit performance thresholds unchanged.
-      - run: npm test -- --maxWorkers=1
-      - run: node --import tsx --test --test-concurrency=1 integration/*.checks.mjs
-      - run: npm run typecheck
-      - run: npm run build
+      - if: inputs.scope != 'public-flight'
+        run: npm test -- --maxWorkers=1
+      - if: inputs.scope != 'public-flight'
+        run: node --import tsx --test --test-concurrency=1 integration/*.checks.mjs
+      - if: inputs.scope != 'public-flight'
+        run: npm run typecheck
+      - if: inputs.scope != 'public-flight'
+        run: npm run build
       - name: Ten canonical workflows through real Chromium, extension and relay
+        if: inputs.scope != 'public-flight'
         id: browser
         run: npm run test:e2e:relay
       - name: Ten additional merged browser journeys
+        if: inputs.scope != 'public-flight'
         run: node --import tsx .github/scripts/architecture-e2e.mjs --deterministic
       - name: Ten journeys with live Jev and Gemini
+        if: inputs.scope != 'public-flight'
         id: live
         env:
           GEMINI_KEY: ${{ secrets.GEMINI_KEY }}
@@ -43,7 +56,7 @@ jobs:
           ENABLE_SCREENSHOTS: 'false'
         run: node --import tsx .github/scripts/architecture-e2e.mjs --live
       - name: Exact user flight prompt, public websites, no booking
-        if: always() && steps.browser.outcome == 'success'
+        if: always() && (steps.browser.outcome == 'success' || inputs.scope == 'public-flight')
         env:
           GEMINI_KEY: ${{ secrets.GEMINI_KEY }}
           TYPESAFE_API_KEY: ${{ secrets.TYPESAFE_API_KEY }}

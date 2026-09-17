@@ -13,5 +13,7 @@ test('public flight failures preserve low-confidence diagnosis without recording
   await assert.rejects(runPublicFlight({ boundary, planner, writer, report }));
   assert.equal(report.publicFlight.failureCategory, 'low-confidence');
   assert.equal(report.publicFlight.trace[0].confidence, 0.1);
+  assert.equal(report.publicFlight.trace[0].optionCount, 0);
+  assert.equal(report.publicFlight.trace[0].targetIndex, -1);
   assert.equal(Object.hasOwn(report.publicFlight, 'error'), false);
 });

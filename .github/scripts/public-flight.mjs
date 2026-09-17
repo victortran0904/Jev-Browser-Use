@@ -53,7 +53,17 @@ export async function runPublicFlight({ boundary, planner, writer, report }) {
     planner: { plan: async input => {
       assert(++plannerCalls <= 12, 'Flight planner budget exceeded');
       const action = await planner.plan(input);
-      trace.push({ step: plannerCalls, action: action.kind, confidence: Number.isFinite(action.confidence) ? action.confidence : null, candidates: input.observation.candidates.length, ...flightEvidence(input.observation) });
+      trace.push({
+        step: plannerCalls, action: action.kind,
+        confidence: Number.isFinite(action.confidence) ? action.confidence : null,
+        candidates: input.observation.candidates.length,
+        targetIndex: input.observation.candidates.findIndex(item => item.ref === action.target),
+        optionCount: input.observation.candidates.filter(item => /^option\b/.test(item.label)).length,
+        editableFieldCount: input.observation.candidates.filter(item => item.field?.isText).length,
+        nonemptyFieldCount: input.observation.candidates.filter(item => item.field?.value).length,
+        focusedFieldNonempty: Boolean(input.observation.focusedField?.value),
+        ...flightEvidence(input.observation),
+      });
       return action;
     } },
     writer: {
