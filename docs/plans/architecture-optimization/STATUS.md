@@ -8,7 +8,7 @@ Status: BLOCKED before implementation. This branch currently changes documentati
 - Created a fresh clone and an isolated worktree on `perf/browser-architecture-20260917` from `1398bd0bd3c1c327ad9140d92f7351798807511e`.
 - Confirmed the clean-tree precondition before any task preparation.
 - Wrote the eight-task architecture plan and the first XML implementer prompt.
-- Executed the unchanged baseline suite, typecheck, and production build successfully. Sanitized command output is in `BASELINE.log`.
+- Executed the unchanged baseline suite, typecheck, and production build successfully. Sanitized command output is in `BASELINE.txt`.
 
 ## Baseline verification (2026-09-17)
 
