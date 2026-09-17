@@ -88,4 +88,15 @@ describe("real-browser observation", () => {
     } finally { await f.close(); }
   });
 
+  it("reports document and busy-region readiness instead of making the planner infer loading from text", async () => {
+    const f = await browserFixture('<main aria-busy="true"><a href="https://fixture.test/next">Open destination</a></main>');
+    try {
+      const loading = await f.boundary.observe("test");
+      expect(loading).toMatchObject({ readiness: { documentState: "complete", busy: true } });
+      await f.page.locator("main").evaluate(element => element.setAttribute("aria-busy", "false"));
+      const ready = await f.boundary.observe("test");
+      expect(ready).toMatchObject({ readiness: { documentState: "complete", busy: false } });
+    } finally { await f.close(); }
+  });
+
 });

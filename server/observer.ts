@@ -162,6 +162,7 @@ export function createObserver(documentId: string) {
             sections.push(readText(document.body, 2000));
         const pageText = redact(sections.filter(Boolean).join("\n\n").slice(0, 12000));
         return { documentId, url: location.href, title: redact(document.title), candidates, focusedField, pageText,
+            readiness: { documentState: document.readyState, busy: Boolean(document.querySelector('[aria-busy="true"]')) },
             metrics: { domExtractMs: performance.now() - started, examinedCandidates, totalMatches: matches.length, mode } };
     }
     return {

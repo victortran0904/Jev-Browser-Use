@@ -137,7 +137,7 @@ export function createBrowserBoundary(
         ${screenshotSnippet}
         return dom;
       `;
-      const value = await execute(`jev-${runId}`, observeScript) as { metrics?: ObservationMetrics; documentId?: string; candidates?: Candidate[]; pageText?: string; focusedField?: FocusedField | null; url?: string; title?: string };
+      const value = await execute(`jev-${runId}`, observeScript) as { readiness?: Observation["readiness"]; metrics?: ObservationMetrics; documentId?: string; candidates?: Candidate[]; pageText?: string; focusedField?: FocusedField | null; url?: string; title?: string };
       const candidates = value.candidates ?? [];
       const snapshot = `${candidates.map((item) => `${item.label} [ref=${item.ref}]`).join("\n")}\n\nVisible page text:\n${value.pageText ?? ""}`.slice(0, 30_000);
       if (value.metrics) Object.assign(value.metrics, {
@@ -147,7 +147,7 @@ export function createBrowserBoundary(
       const observationId = randomUUID();
       latestObservations.set(runId, observationId);
       return {
-        id: observationId, snapshot, candidates, pageText: value.pageText, documentId: value.documentId, metrics: value.metrics,
+        id: observationId, snapshot, candidates, pageText: value.pageText, documentId: value.documentId, metrics: value.metrics, readiness: value.readiness,
         url: String(value?.url ?? ""), title: String(value?.title ?? ""),
         ...(value.focusedField ? { focusedField: value.focusedField } : {}),
         ...(screenshotPath ? { screenshotUrl: `/api/runs/${runId}/screenshot?observationId=${observationId}` } : {}),

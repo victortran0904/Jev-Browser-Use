@@ -26,6 +26,7 @@ export interface FocusedField {
 export interface Observation {
     id: string;
     documentId?: string;
+    readiness?: { documentState: DocumentReadyState; busy: boolean };
     metrics?: ObservationMetrics;
     pageText?: string;
     /** Compatibility input alias from the earlier remote collector. */

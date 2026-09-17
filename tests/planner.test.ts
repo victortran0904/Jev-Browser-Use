@@ -109,3 +109,19 @@ it("does not forward private field metadata to the external model", async () => 
   expect(JSON.stringify(captured)).not.toContain("PRIVATE_INTERNAL_TOKEN");
   expect(JSON.stringify(captured)).toContain("Hanoi");
 });
+
+it("sends observed readiness and consecutive-wait feedback without private readiness metadata", async () => {
+  let captured: unknown;
+  const planner = createPlanner({ systemOne: async request => {
+    captured = request;
+    const answer = (choice: string) => ({ type: "choice" as const, choice, confidence: 1, probabilities: { [choice]: 1 } });
+    return { answers: { kind: answer("click_item"), site: answer("no_site"), item: answer("e1") } };
+  } });
+  const readiness = { documentState: "complete" as const, busy: false, privateToken: "PRIVATE_READINESS" };
+  await planner.plan({ goal: "Open destination", history: ["opened page", "waited", "waited"], observation: {
+    id: "ready", url: "https://example.com", title: "Navigation", snapshot: "", pageText: "Open destination", readiness,
+    candidates: [{ ref: "e1", label: 'link "Open destination"' }],
+  } });
+  expect(captured).toMatchObject({ state: { consecutive_waits: 2, page: { readiness: { documentState: "complete", busy: false } } } });
+  expect(JSON.stringify(captured)).not.toContain("PRIVATE_READINESS");
+});

@@ -46,3 +46,19 @@ Code-quality self-review: accepted with the documented limits. This is a second 
 ## Completed native-browser verification
 
 After the combined regression/typecheck/build gates, both `npm run test:e2e:relay` and `node --import tsx .github/scripts/architecture-e2e.mjs --deterministic` exited 0 on the VPS: ten canonical plus ten additional journeys passed through actual Chromium, Browser Control extension and relay. The canonical fixture measured focus-click median 372 ms, redirect navigation 114 ms, and Back recovery 179 ms. These are small controlled-fixture measurements, not a same-run baseline comparison or arbitrary-site speedup claim. Live model and public-flight acceptance is still reported separately against the pushed SHA.
+
+## Live acceptance follow-through: readiness and diagnostics
+
+Exact-head VPS run `35272680392` passed all deterministic gates and 9/10 live journeys, including the multi-field flight fixture. The redirect journey selected six waits without progress. The public flight attempt reached a public page and all 11 provider requests returned HTTP 200, but no fare was verified. Those failures remain preserved; they are not authentication or machine-access failures.
+
+Three further public-boundary tests were observed RED then GREEN: browser observations omitted document/busy readiness; planner requests omitted readiness plus consecutive-wait feedback; public-flight reports reduced low confidence to `browser-or-policy`. The changes add readiness metadata, allowlist it in model state, count trailing waits, and preserve safe diagnostic categories/confidence. The navigation instructions also no longer incorrectly forbid using visible links to navigate. This instruction correction is motivated by the actual live failure; a new model success is not inferred from unit tests.
+
+### Specification review of this follow-through
+
+The exact prompt, confidence threshold, 12-step guard, allowed public domains, no-booking policy, and dated-CAD fare evidence assertions are unchanged. Readiness is advisory, not proof that hydration or all asynchronous work has finished; `aria-busy` represents the page's declared busy state. Wait remains an available action. No action is automatically forced to make a benchmark pass. Public diagnostics expose finite confidence and static failure categories, not raw errors or model credentials. Specification self-review accepted pending verification.
+
+### Subsequent quality review of this follow-through
+
+Reviewed the actual diff after the specification pass. The new fields are optional for compatibility; model state copies only the public readiness fields and drops extra private metadata. Browser state is captured in the same evaluation as the observation. Failure classification reuses the existing helper instead of maintaining a divergent second classifier. Public-fare assertions and action guards were retained. No dependency, iframe privileges, timeout relaxation, or new purchases are introduced. Quality self-review accepted pending complete-suite and exact-head acceptance. Neither review is independent-agent or Greptile approval.
+
+Complete local follow-through verification exited 0 on the VPS: **72 Vitest tests across 15 files**, **25 Node checks**, typecheck, production build, and six harness assertions passed. The two review passes above are accepted for the code change; exact-head live/model and public-fare outcomes remain separately reported, not inferred from these passing checks.
