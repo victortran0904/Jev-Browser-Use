@@ -53,7 +53,7 @@ Open [http://localhost:8787](http://localhost:8787).
 - Actions are limited to open site, click item, type text, Enter/Escape, scroll, back, wait, done, or none.
 - Jev only classifies bounded choices. Gemini may generate one validated HTTPS URL or the text for an already-focused browser field.
 - Action refs are bound to the current observation so stale actions fail closed.
-- Concrete action results feed the next decision. Runs stop on `done`, `none`, low confidence, two repeated/no-op actions, 12 steps, or immediately via **Stop**.
+- Concrete action results feed the next decision. Runs stop on `done`, `none`, low confidence, six repeated/no-op actions, 12 steps, or immediately via **Stop**.
 - Page text is treated as untrusted state, never as instructions.
 
 ## Commands
@@ -67,3 +67,38 @@ npm run browser:extension-path
 ```
 
 Run state is memory-only. Latest per-run screenshots live under `.runs/` and are ignored by Git. This app is intentionally local-only and has no deployment configuration.
+
+
+## Browser regression suite
+
+`npm run test:e2e` runs ten deterministic end-to-end browser-boundary cases in
+real Chromium using a local HTTPS fixture. Install the lockfile-matched browser
+first with `node node_modules/playwright-core/cli.js install chromium`.
+The local adapter replaces only the external Browser Control transport; it does
+not replace DOM interaction or Playwright actionability checks.
+
+`npm run test:e2e:relay` exercises the same cases through the actual Browser
+Control relay and extension and requires a display (CI uses `xvfb-run -a`).
+The suite covers focus latency, POST and delayed popups, stable references,
+sensitive fields, redirects/SPA updates, stale-node rejection, multi-field
+search, concurrent-run isolation, and lifecycle cleanup. Fixture searches are
+synthetic and do not establish real flight prices.
+
+Repository credentials are used only in the dedicated GitHub Actions live step.
+No keys are read back to a workstation or included in test artifacts.
+
+### Owned-popup compatibility
+
+This app pins Browser Control to **0.7.1**. `npm ci` runs the local
+`scripts/browser-control-compat.mjs` compatibility patch, verified against exact
+before/after SHA-256 checksums. It attaches newly created tabs only when Chrome
+identifies their opener as a relay-owned Jev session; unrelated/user-owned tabs
+are not attached. The original package license remains in `node_modules`.
+A dependency upgrade requires reviewing and updating the patch; unknown versions
+or modified dependency files fail installation rather than accepting a partial
+patch. After updating an existing local install, restart its Browser Control
+relay and reload the unpacked extension before testing popup workflows.
+The compatibility layer adds the `webNavigation` extension permission solely to
+receive source/target tab IDs for newly opened links, including `noopener` links.
+It does not change the website's `window.opener` or weaken that isolation.
+The concurrent-run regression asserts that `window.opener` is still null.

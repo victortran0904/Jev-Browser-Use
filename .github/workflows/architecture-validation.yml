@@ -1,0 +1,78 @@
+name: Browser architecture validation
+on:
+  push:
+    branches: [perf/browser-architecture-e2e-20260917]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: architecture-validation-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  regression:
+    if: github.repository == 'victortran0904/Jev-Browser-Use' && github.ref == 'refs/heads/perf/browser-architecture-e2e-20260917'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: '22'
+      - run: npm ci
+      - run: npm test
+      - run: npm run typecheck
+      - run: npm run build
+      - run: node --import tsx .github/scripts/live-validation.mjs --self-test
+  browser-e2e:
+    needs: regression
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: '22'
+      - run: npm ci
+      - name: Install lockfile-matched browser
+        run: node node_modules/playwright-core/cli.js install --with-deps --no-shell chromium
+      - name: Ten end-to-end cases through the real relay and extension
+        run: xvfb-run -a node --import tsx e2e/browsing.mjs --relay
+      - name: Upload fixture results
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
+        with:
+          name: browser-e2e-${{ github.sha }}-${{ github.run_attempt }}
+          path: .ci-results/browsing.json
+          if-no-files-found: warn
+          retention-days: 7
+  live-models:
+    needs: browser-e2e
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: '22'
+      - run: npm ci
+      - run: node node_modules/playwright-core/cli.js install --with-deps --no-shell chromium
+      - name: Exercise application with repository-managed credentials
+        env:
+          GEMINI_KEY: ${{ secrets.GEMINI_KEY }}
+          TYPESAFE_API_KEY: ${{ secrets.TYPESAFE_API_KEY }}
+          ENABLE_SCREENSHOTS: 'false'
+        run: xvfb-run -a node --import tsx .github/scripts/live-validation.mjs --flight
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
+        if: always()
+        with:
+          name: live-models-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            .ci-results/live-validation.json
+            .ci-results/flight.json
+          retention-days: 7

@@ -1,0 +1,66 @@
+name: Live integration validation
+
+on:
+  push:
+    branches: [perf/browser-architecture-20260917]
+    paths:
+      - .github/workflows/live-validation.yml
+      - .github/scripts/live-validation.mjs
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: live-validation-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  regression:
+    if: github.repository == 'victortran0904/Jev-Browser-Use' && github.ref == 'refs/heads/perf/browser-architecture-20260917'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '22'
+      - run: npm ci
+      - run: npm test
+      - run: npm run typecheck
+      - run: npm run build
+      - name: Validate verification harness without credentials
+        run: node --import tsx .github/scripts/live-validation.mjs --self-test
+
+  live:
+    needs: regression
+    if: github.repository == 'victortran0904/Jev-Browser-Use' && github.ref == 'refs/heads/perf/browser-architecture-20260917'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '22'
+      - run: npm ci
+      - name: Install the lockfile-matched Chromium and test dependencies
+        run: node node_modules/playwright-core/cli.js install --with-deps --no-shell chromium
+      - name: Exercise live APIs and the real Browser Control extension
+        env:
+          GEMINI_KEY: ${{ secrets.GEMINI_KEY }}
+          TYPESAFE_API_KEY: ${{ secrets.TYPESAFE_API_KEY }}
+          ENABLE_SCREENSHOTS: 'false'
+          CI: 'true'
+        run: xvfb-run -a node --import tsx .github/scripts/live-validation.mjs
+      - name: Upload allowlisted results only
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: live-validation-${{ github.sha }}-attempt-${{ github.run_attempt }}
+          path: .ci-results/live-validation.json
+          if-no-files-found: warn
+          retention-days: 7

@@ -1,0 +1,14 @@
+
+// Jev popup ownership compatibility for browser-control 0.7.1.
+// Only tab IDs are sent; the authenticated relay validates source ownership.
+const jevNotifiedTargets = new Set();
+function jevAnnounceTarget(tabId, sourceTabId) {
+  if (!Number.isInteger(tabId) || !Number.isInteger(sourceTabId)
+    || !openSocket() || jevNotifiedTargets.has(tabId)) return;
+  jevNotifiedTargets.add(tabId);
+  sendMessage({ method: "tabs.created", params: { tabId, openerTabId: sourceTabId } });
+}
+chrome.tabs.onCreated.addListener(tab => jevAnnounceTarget(tab.id, tab.openerTabId));
+// Chrome provides sourceTabId even for links which intentionally have no JS opener.
+chrome.webNavigation.onCreatedNavigationTarget.addListener(details => jevAnnounceTarget(details.tabId, details.sourceTabId));
+chrome.tabs.onRemoved.addListener(tabId => jevNotifiedTargets.delete(tabId));
