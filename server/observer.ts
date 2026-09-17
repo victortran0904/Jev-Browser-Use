@@ -56,7 +56,7 @@ export function createObserver(documentId: string) {
         const sensitiveValues = Array.from(document.querySelectorAll("input,textarea,[contenteditable=true]"))
             .filter(isSensitive).map(fieldValue).filter(Boolean).sort((a, b) => b.length - a.length);
         const redact = (text: string) => sensitiveValues.reduce((value, secret) => value.split(secret).join("[redacted]"), text);
-        const selector = "a,button,input,textarea,select,[role=button],[role=link],[role=textbox],[role=searchbox],[contenteditable=true]";
+        const selector = "a,button,input,textarea,select,[role=option],[role=button],[role=link],[role=textbox],[role=searchbox],[contenteditable=true]";
         queueChanges(mutations.takeRecords());
         const changes = pendingChanges;
         pendingChanges = [];

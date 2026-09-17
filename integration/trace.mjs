@@ -5,5 +5,7 @@ export function traceStep(action,observation,steps=[]) {
 }
 export function failureCategory(error) {
   const message=String(error?.message||error||'');
+  if (/Unexpected (?:end|token)|JSON (?:input|parse)|not valid JSON|unterminated.*JSON/i.test(message)) return 'invalid-model-json';
+  if (/Gemini returned no structured response/i.test(message)) return 'empty-model-response';
   return /401|invalid.api.key|authentication/i.test(message)?'authentication':/403|forbidden/i.test(message)?'permission':/429|quota/i.test(message)?'rate-limit':/timeout|timed.out|aborted/i.test(message)?'timeout':/503|temporar.*unavailable|overload/i.test(message)?'provider-unavailable':/request budget|budget exceeded/i.test(message)?'request-budget':/stale/i.test(message)?'stale-state':/step.limit/i.test(message)?'step-limit':/missing.*secret/i.test(message)?'missing-secrets':/confidence/i.test(message)?'low-confidence':/six repeated|ineffective/i.test(message)?'no-progress':/completion evidence|verified dated flight/i.test(message)?'goal-not-proven':/target command rejected/i.test(message)?'target-discovery-rejected':'assertion-or-runtime-failure';
 }
