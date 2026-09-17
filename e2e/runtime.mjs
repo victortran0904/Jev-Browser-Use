@@ -28,7 +28,7 @@ export async function createRuntime(route, { relay = false } = {}) {
     }
     server?.closeAllConnections();
     if (server?.listening) await new Promise(resolve => server.close(resolve));
-    await rm(temp, { recursive: true, force: true });
+    await rm(temp, { recursive: true, force: true, maxRetries: 8, retryDelay: 250 });
   }
   try {
     execFileSync('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-keyout', path.join(temp, 'key.pem'), '-out', path.join(temp, 'cert.pem'), '-days', '1', '-subj', '/CN=127.0.0.1', '-addext', 'subjectAltName=IP:127.0.0.1'], { env: childEnv(), stdio: 'ignore' });

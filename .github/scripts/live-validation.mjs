@@ -1,3 +1,4 @@
+import { testFlight } from "../../e2e/flight.mjs";
 // Verification only: imports the current application; never prints API keys,
 // raw provider errors/responses, browser logs, page contents, or model prompts.
 import assert from "node:assert/strict";
@@ -73,6 +74,7 @@ if (process.argv.includes("--self-test")) {
   process.exit(0);
 }
 
+const flightEnabled = process.argv.includes("--flight");
 const originalFetch = globalThis.fetch;
 const counts = { typesafe: 0, gemini: 0 };
 // Bound billable requests including SDK retries, and prohibit redirects carrying credentials.
@@ -86,7 +88,7 @@ globalThis.fetch = async (input, init) => {
     return originalFetch(input, init);
   }
   assert.equal(url.protocol, "https:");
-  if (++counts[provider] > (provider === "typesafe" ? 12 : 10)) throw new Error("Request budget exceeded");
+  if (++counts[provider] > (provider === "typesafe" ? (flightEnabled ? 40 : 12) : (flightEnabled ? 18 : 10))) throw new Error("Request budget exceeded");
   const started = performance.now();
   const record = { provider, number: counts[provider], model: safeName(url.pathname.match(/\/models\/([^:]+):/)?.[1] || (provider === "typesafe" ? "jev-latest" : "catalog")) };
   report.requests.push(record);
@@ -129,7 +131,7 @@ const watchdog = setTimeout(async () => {
   await saveReport();
   await cleanup();
   process.exit(1);
-}, 240_000);
+}, flightEnabled ? 420_000 : 240_000);
 
 try {
   const keysPresent = await check("repository-secrets-present", async () => {
@@ -290,6 +292,11 @@ try {
   });
   else skip("live-agent-end-to-end-local-search", "missing-secrets-or-browser-check-failed");
   if (!browserReady) skip("real-browser-navigation-observation-and-actions", "browser-startup-failed");
+  if (flightEnabled && browserReady && keysPresent) {
+    await check("live-flight-search-workflow", () => testFlight({ planner, writer, classify,
+      registerActive: (controller, run) => { activeController = controller; activeRun = run; },
+    }));
+  } else if (flightEnabled) skip("live-flight-search-workflow", "missing-secrets-or-browser-startup-failed");
   report.requestCounts = counts;
 } catch (error) {
   report.tests.push({ name: "harness", status: "fail", ...classify(error) });

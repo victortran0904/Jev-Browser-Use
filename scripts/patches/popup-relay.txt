@@ -11,7 +11,7 @@
         if (!extensionRpc.isCurrent(socket) || generation !== extensionGeneration
           || registry.tabTargets.get(openerTabId) !== opener) return;
         yield* rootLifecycle.attach({ tabId, owner: "relay", browserControlSessionId: ownerId,
-          expectedExtensionGeneration: generation });
+          expectedExtensionGeneration: generation, jevOpenerId: opener.targetInfo.targetId });
       })).catch(() => { console.warn("[jev] Owned popup attachment failed"); });
       return;
     }

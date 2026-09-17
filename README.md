@@ -98,3 +98,7 @@ A dependency upgrade requires reviewing and updating the patch; unknown versions
 or modified dependency files fail installation rather than accepting a partial
 patch. After updating an existing local install, restart its Browser Control
 relay and reload the unpacked extension before testing popup workflows.
+The compatibility layer adds the `webNavigation` extension permission solely to
+receive source/target tab IDs for newly opened links, including `noopener` links.
+It does not change the website's `window.opener` or weaken that isolation.
+The concurrent-run regression asserts that `window.opener` is still null.

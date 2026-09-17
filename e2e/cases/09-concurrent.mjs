@@ -3,7 +3,7 @@ export default function register({ cases, routes, html, boundary, runtime, click
     const token = url.searchParams.get('run') === 'A' ? 'A' : 'B';
     res.end(html(`<a href="/parallel-result?run=${token}" target="_blank">Open owned result</a>`));
   });
-  routes.set('/parallel-result', (_req, res, url) => res.end(html(`<h1>Owned result ${url.searchParams.get('run') === 'A' ? 'A' : 'B'}</h1>`)));
+  routes.set('/parallel-result', (_req, res, url) => res.end(html(`<h1>Owned result ${url.searchParams.get('run') === 'A' ? 'A' : 'B'}</h1><output id="isolation"></output><script>document.getElementById("isolation").textContent=window.opener===null?"No JS opener":"Has JS opener"</script>`)));
   cases.push(['09-concurrent-run-isolation', async id => {
     const other = id + '-other';
     try {
@@ -17,6 +17,7 @@ export default function register({ cases, routes, html, boundary, runtime, click
       ]);
       assert(!ra.snapshot.includes('Owned result B'));
       assert(!rb.snapshot.includes('Owned result A'));
+      assert(ra.snapshot.includes('No JS opener') && rb.snapshot.includes('No JS opener'), 'Website noopener isolation must remain intact');
       return { concurrentRuns: 2, targetIsolation: true };
     } finally { await boundary.close(other); }
   }]);

@@ -1,10 +1,14 @@
 {
   "dist/cli.js": {
     "original": "466ed61f0fe9e865a8b5544d54ca184d95457808b7e687763e948585860a6aee",
-    "patched": "6a125a9c5592db3117b384ab0d4742f4d108a1beb0a56026b922740f178cfdf1"
+    "patched": "b9bcfbefdfa4022322532ab896fdbba4df6f21a3e4e006270f0f0e978327994d"
   },
   "extension/dist/background.js": {
     "original": "ccd123194f70a0e3aa7f5752f8ca18c32832acd25a868a95bd95a1bf50073e2c",
-    "patched": "62026e0cda0283e0a8cacf42760fad8ab91bca869ec1b6986bb1316f5a2ca43b"
+    "patched": "fe03d94cc1aca35082d9d79c5c4fe6507b0e8c326686b0bd0db939c11e3dc9d6"
+  },
+  "extension/dist/manifest.json": {
+    "original": "5603612b2190b699f5ad8132a38bd85339f6e8012e24ae8b123ebf8bac38d438",
+    "patched": "fb4e32aca3b34de928b9e4f287ba325cb71b90ffd1a499aebf2d52183e5bf5b4"
   }
 }

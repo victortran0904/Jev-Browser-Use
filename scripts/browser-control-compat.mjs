@@ -29,6 +29,12 @@ export async function applyCompatibility(root = path.resolve('node_modules/@open
       const handler = await readFile(new URL('popup-relay.txt', assets), 'utf8');
       output = source.replace(event, 'var extensionEventMethods = new Set([...extensionEventMethodValues, "tabs.created"]);');
       output = output.replace(anchor, handler + anchor);
+      const identity = '    const restored = options.browserControlSessionId ? void 0 : this.options.sessions.persistedTargetOwner(targetInfo.targetId);';
+      output = output.replace(identity, '    if (options.jevOpenerId && !targetInfo.openerId) targetInfo.openerId = options.jevOpenerId;\n' + identity);
+    } else if (name.endsWith('manifest.json')) {
+      const extension = JSON.parse(source);
+      extension.permissions.push('webNavigation');
+      output = JSON.stringify(extension, null, 2) + '\n';
     } else {
       output = source + await readFile(new URL('popup-extension.txt', assets), 'utf8');
     }
