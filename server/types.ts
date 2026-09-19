@@ -22,6 +22,7 @@ export interface FocusedField {
     placeholder: string;
     value: string;
     isText: boolean;
+    preferredAction?: "fill" | "click";
 }
 export interface Observation {
     id: string;

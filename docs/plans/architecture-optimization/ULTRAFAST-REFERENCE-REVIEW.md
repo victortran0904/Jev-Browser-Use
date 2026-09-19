@@ -104,3 +104,25 @@ The rule is generic to date-picker/calendar interactions and contains no Google 
 ### Code-quality/safety self-review
 
 The production diff is a single planner-policy string extension. It does not bypass operation-specific target heads or browser freshness/actionability checks. The test observes the actual external request packet rather than an internal helper. Full verification after the change passed 117 Vitest tests in 29 files, 29 Node integration checks, typecheck, production build, and `git diff --check`. Quality/safety self-review accepts the patch for a fresh exact-head public-site run.
+
+## Click-preferred date-editor follow-through
+
+The `a2a93ff` public trace confirmed airport autocomplete is fixed: origin and destination both reached visible matching suggestions and were selected. The remaining failure moved to the date editor. Google Flights exposes Departure as an ordinary text input, but its own `aria-describedby` says to enter a date or use arrow keys to change the current date. Jev therefore kept receiving it as a fill target and spent four writer calls before opening the calendar.
+
+A new real-browser RED test first showed that this semantically date-controlled text input was still reported as an ordinary fill target. The observer now derives only a bounded internal `preferredAction` hint from strong date-picker signals (native date-like input types, “calendar”, “date picker”, or an arrow-key date instruction). The hint text itself is not forwarded to model state.
+
+A second RED test protected ordinary date text fields: a hint such as “Enter a date as YYYY-MM-DD” must remain fill-preferred. This drove the heuristic from a broad word “date” match to the narrower picker signals above. The planner’s fill target head and the available-action set both exclude click-preferred fields; those controls remain normal click candidates and keep all browser freshness/actionability checks.
+
+A third RED/GREEN planner test covers the original prompt’s month-only ambiguity. When a goal names a month but no day, the policy tells Jev to choose the earliest available selectable date in that month. If the UI requires a paired return date but the user did not request one, it prefers an available single-date/one-way mode rather than inventing a return date. This does not alter the user prompt or the public evidence requirements.
+
+### Date-editor stage 1 — specification self-review
+
+The implementation changes the dynamic action space rather than scripting Google Flights. No hostname, CSS class, airport, reference ID, December date, or price is embedded in production logic. The browser still observes the actual field and calendar controls; Jev still chooses the click target. The 0.30 confidence threshold, two read-only pre-dispatch recoveries, 12-browser-action cap, 24-decision ceiling, writer-call budget, and no-booking/account/payment restrictions remain intact.
+
+The first review rejected an over-broad implementation that would have exposed the full `aria-describedby` text to the model and treated any mention of “date” as a picker. The corrected implementation keeps the description browser-internal and requires stronger semantic signals. Specification self-review accepts the narrowed behavior.
+
+### Date-editor stage 2 — code-quality/safety self-review
+
+After the specification pass, the exact runtime/test diff was re-read. `preferredAction` is optional and additive, so existing observation consumers remain compatible. It only removes unsafe/inappropriate free-text operations from the model’s available action set; it does not make a non-clickable control executable or bypass action-time guards. Sensitive fields still fail the same checks and no `aria-describedby` text is copied into model-facing state.
+
+The tightened implementation completed all local gates on Oracle `free`: **121 Vitest tests in 29 files**, **30 Node integration checks**, typecheck, production build, **10/10** canonical Browser Control extension/relay journeys, and **10/10** additional deterministic journeys. Controlled fixture measurements in this pass were approximately **155 ms** focus-click median, **91 ms** redirect navigation, and **168 ms** Back recovery. These are fixture measurements, not universal website claims. Quality/safety self-review accepts the patch for secret-backed live/public-flight verification.

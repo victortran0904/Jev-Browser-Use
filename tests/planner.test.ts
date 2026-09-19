@@ -197,3 +197,40 @@ it("tells the planner to use calendar controls instead of repeatedly filling dat
   } });
   expect(JSON.stringify(captured)).toMatch(/date picker.*click.*date.*confirm|calendar.*click.*date/i);
 });
+
+
+it("keeps click-preferred date editors out of the fill target head", async () => {
+  let captured: any;
+  const answer = (choice: string) => ({ type: "choice" as const, choice, confidence: 1, probabilities: { [choice]: 1 } });
+  const planner = createPlanner({ systemOne: async request => {
+    captured = request;
+    return { answers: { kind: answer("click_item"), site: answer("no_site"), click_target: answer("e2"), fill_target: answer("e1") } };
+  } });
+  await planner.plan({ goal: "Find a flight in December", history: [], observation: {
+    id: "picker-head", url: "https://example.com", title: "Flights", snapshot: "", pageText: "Flight search", candidates: [
+      { ref: "e1", label: 'combobox "Origin"', field: { label: "Origin", placeholder: "", value: "", isText: true, preferredAction: "fill" } },
+      { ref: "e2", label: 'textbox "Departure"', field: { label: "Departure", placeholder: "Departure", value: "", isText: true, preferredAction: "click" } },
+    ],
+  } });
+  expect(Object.keys(captured.questions.fill_target.criteria)).not.toContain("e2");
+  expect(Object.keys(captured.questions.click_target.criteria)).toContain("e2");
+  expect(captured.state.page.controls.find((item: any) => item.ref === "e2")).toMatchObject({ preferred_action: "click" });
+});
+
+
+it("gives deterministic guidance for month-only travel dates without inventing a return date", async () => {
+  let captured: any;
+  const answer = (choice: string) => ({ type: "choice" as const, choice, confidence: 1, probabilities: { [choice]: 1 } });
+  const planner = createPlanner({ systemOne: async request => {
+    captured = request;
+    return { answers: { kind: answer("click_item"), site: answer("no_site"), click_target: answer("e1"), fill_target: answer("no_fill_target") } };
+  } });
+  await planner.plan({ goal: "Find flights from Hanoi to Vancouver in December", history: [], observation: {
+    id: "month-only", url: "https://example.com", title: "Flights", snapshot: "", pageText: "Calendar",
+    candidates: [{ ref: "e1", label: 'button "Tuesday, December 1, 2026"' }, { ref: "e2", label: 'button "Tuesday, December 8, 2026"' }],
+  } });
+  const payload = JSON.stringify(captured);
+  expect(payload).toMatch(/month.*without.*day|month.*no.*day/i);
+  expect(payload).toMatch(/earliest.*available|earliest.*selectable/i);
+  expect(payload).toMatch(/return date.*not.*request|single-date|one-way/i);
+});

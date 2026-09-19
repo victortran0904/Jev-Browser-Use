@@ -16,7 +16,12 @@ export function createObserver(documentId: string) {
         const sensitive = isSensitive(el);
         const isText = !sensitive && !el.hasAttribute("disabled") && !el.hasAttribute("readonly")
             && (el instanceof HTMLTextAreaElement || el.isContentEditable || ["text", "search", "email", "url", "tel", "number", "date", "datetime-local", "month", "week", "time"].includes(type));
+        const describedBy = (el.getAttribute("aria-describedby") || "").split(/\s+/).filter(Boolean)
+            .map(id => document.getElementById(id)?.textContent || "").join(" ");
+        const description = redact(describedBy).replace(/\s+/g, " ").trim().slice(0, 300);
+        const datePicker = ["date", "datetime-local", "month", "week", "time"].includes(type) || /\bcalendar\b|\bdate picker\b|\barrow keys?\b.*\bdate\b/i.test(description);
         return { ref: identities.get(el), type, sensitive, isText,
+            preferredAction: isText ? (datePicker ? "click" : "fill") : undefined,
             label: redact(el.getAttribute("aria-label") || el.getAttribute("name") || el.id || ""),
             placeholder: redact(el.getAttribute("placeholder") || ""), value: sensitive ? "" : redact(fieldValue(el)).slice(0, 300) };
     };

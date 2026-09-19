@@ -15,6 +15,7 @@ export function modelPage(observation: Observation) {
     controls: observation.candidates.map(item => ({
       ref: item.ref, label: item.label,
       ...(item.field ? { editable: item.field.isText && !item.field.sensitive,
+        preferred_action: item.field.preferredAction,
         value: item.field.sensitive ? "" : item.field.value.slice(0, 120) } : {}),
     })),
     semantic_dom: observation.pageText ?? observation.pageContext ?? observation.snapshot,

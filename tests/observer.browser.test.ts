@@ -110,3 +110,21 @@ it('uses a descendant accessible label when a clickable wrapper has only a terse
     ]));
   } finally { await f.close(); }
 }, 15000);
+
+
+it('marks a text input described as a date editor as click-preferred without making it unsafe', async () => {
+  const f = await browserFixture('<p id="hint">Enter a date or use the arrow keys to change the current date.</p><input aria-label="Departure" aria-describedby="hint">');
+  try {
+    const observation = await f.boundary.observe('test');
+    expect(observation.candidates[0].field).toMatchObject({ isText: true, preferredAction: 'click' });
+  } finally { await f.close(); }
+}, 15000);
+
+
+it('keeps an ordinary text date field fill-preferred when its hint does not describe a picker', async () => {
+  const f = await browserFixture('<p id="hint">Enter a date as YYYY-MM-DD.</p><input aria-label="Invoice date" aria-describedby="hint">');
+  try {
+    const observation = await f.boundary.observe('test');
+    expect(observation.candidates[0].field).toMatchObject({ isText: true, preferredAction: 'fill' });
+  } finally { await f.close(); }
+}, 15000);
