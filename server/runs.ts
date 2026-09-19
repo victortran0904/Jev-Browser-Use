@@ -193,7 +193,7 @@ export function createRunController(deps: RunControllerOptions = {}) {
         }
 
         if (run.stopped || run.status !== "running") return;
-        if (browserActionExecuted) browserActionCount += 1;
+        if (browserActionExecuted && !["wait", "scroll_down", "scroll_up", "press_escape"].includes(action.kind)) browserActionCount += 1;
         const actMs = performance.now() - actStart;
         const browserMs = Math.max(0, actMs - writerMs);
         const totalStepMs = performance.now() - stepStart;
