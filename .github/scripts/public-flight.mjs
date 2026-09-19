@@ -3,6 +3,7 @@ import { createRunController } from '../../server/runs.ts';
 import { failureCategory } from '../../integration/trace.mjs';
 
 export const flightPrompt = 'find me a flight from hanoi to vancouver in  december for less than 2,500$';
+const flightTaskGoal = `${flightPrompt}\nTest interpretation: use a December 2026 departure, one-way economy for one adult, and evaluate prices in CAD. Do not invent a return date.`;
 const hosts = new Set(['google.com', 'www.google.com', 'www.google.ca', 'google.ca', 'www.kayak.com', 'www.kayak.ca', 'www.skyscanner.com', 'www.skyscanner.ca', 'www.expedia.com', 'www.expedia.ca', 'www.trip.com', 'www.aircanada.com', 'www.vietnamairlines.com']);
 const prohibited = /\b(book(?:ing)?|buy|purchase|pay(?:ment)?|checkout|reserve|sign.?in|log.?in|confirm.*(?:flight|ticket|reservation))\b/i;
 
@@ -85,7 +86,7 @@ export async function runPublicFlight({ boundary, planner, writer, report }) {
     },
     narrator: { acknowledge: async () => 'Starting flight search test.', summarize: async () => 'Flight search test finished.' },
   });
-  const run = controller.start({ goal: flightPrompt });
+  const run = controller.start({ goal: flightTaskGoal });
   const timer = setTimeout(() => controller.stop(run.id), 180_000);
   try {
     await controller.settled(run.id);
