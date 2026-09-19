@@ -47,7 +47,7 @@ describe("Jev planner", () => {
     expect(request).toContain("protection");
     expect(request).toContain("instead of done");
   });
-  it("sends a self-contained page context without repeating candidate labels", async () => {
+  it("gives each speculative target head a compact compatible label while keeping shared page context", async () => {
     let packet: unknown;
     const planner = createPlanner({ systemOne: async request => {
       packet = request;
@@ -60,8 +60,11 @@ describe("Jev planner", () => {
       candidates: [{ ref: "e1", label: 'button "UNIQUE_BUTTON_LABEL"' }, { ref: "e2", label: 'button "Cancel"' }],
     } });
     const json = JSON.stringify(packet);
-    expect(json.match(/UNIQUE_BUTTON_LABEL/g)).toHaveLength(1);
+    expect(json.match(/UNIQUE_BUTTON_LABEL/g)).toHaveLength(2);
     expect(json).toContain("Main result state");
+    const target = (packet as any).questions.click_target.criteria.e1;
+    expect(target).toContain("UNIQUE_BUTTON_LABEL");
+    expect((packet as any).questions.fill_target.criteria).not.toHaveProperty("e1");
   });
 
   it("binds a direct-fill choice to the selected item and its confidence", async () => {

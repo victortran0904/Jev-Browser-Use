@@ -142,3 +142,21 @@ The behavior is driven entirely by current observed controls and the user's requ
 After the specification pass, the exact change was re-read. Production code changes only the planner policy string; no browser executor, selector, observation bound, transport, model selection, credential handling, or mutation budget changed. The new test inspects the actual packet sent to the external TypeSafe boundary, preventing a false GREEN caused merely by a candidate named “Next” elsewhere in the request.
 
 A direct public-page probe independently confirmed that one real Next click transitions the visible calendar controls to include December dates. Final local verification after the rule passed **122 Vitest tests in 29 files**, **30 Node integration checks**, typecheck, build, **10/10** canonical extension/relay journeys, and **10/10** additional deterministic journeys. Quality/safety self-review accepts this iteration for secret-backed public acceptance. This is a self-review under the user's subagent waiver, not external approval.
+
+## Operation-specific target grounding
+
+The `4c89823` public run still stopped in the first calendar viewport even after explicit navigation guidance. Its click decision had 63 compatible refs but the target criteria values were null, so the target head had to correlate opaque refs back to the shared control table. The linked `browser-use/jev-ultrafast` implementation instead supplies compact element semantics directly inside every operation-specific target head.
+
+The existing compactness test was changed first and observed RED: a unique button label appeared only once in shared state and not in the click target head. The minimal implementation gives each compatible target a bounded description containing its already-redacted label plus safe current value/preferred-action metadata. Incompatible controls are still absent from each head. The same test is GREEN with the label appearing once in shared controls and once in the compatible click head.
+
+### Target-grounding stage 1 — specification self-review
+
+This preserves one TypeSafe request per decision cycle and speculative operation-specific target heads. It does not change which elements are observable or executable; it only makes an already-compatible target choice self-describing. The target description is capped at 320 characters, and fill heads still exclude non-editable, sensitive, and click-preferred fields.
+
+The reliability tradeoff intentionally reintroduces bounded duplication of a target's display label. This supersedes the earlier “label exactly once” optimization because live evidence showed opaque target criteria materially degraded selection confidence on large dynamic controls. No browser action, confidence threshold, recovery budget, or site-specific behavior is added. Specification self-review accepts the tradeoff.
+
+### Target-grounding stage 2 — code-quality/safety self-review
+
+After the specification pass, the exact two-file runtime/test diff was reviewed. Target descriptions are built only from the observer's existing candidate label and field metadata. Sensitive fields contribute no current-value detail; non-sensitive current values were already present in shared model state. No private reference signatures or raw DOM objects are added. Descriptions are plain strings and cannot become selectors, coordinates, JavaScript, or browser commands.
+
+The target helper is local to the planner and does not widen its public interface. The existing fallback for injected legacy test clients remains unchanged. Full Oracle verification after this change passed **122 Vitest tests in 29 files**, **30 Node integration checks**, typecheck, production build, **10/10** canonical extension/relay journeys, and **10/10** additional deterministic journeys. Controlled fixture results were about **157 ms** focus-click median, **84 ms** redirect navigation, and **140 ms** Back recovery. Quality/safety self-review accepts this patch for a fresh secret-backed run; these are self-reviews, not independent approval.

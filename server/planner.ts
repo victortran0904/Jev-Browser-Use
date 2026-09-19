@@ -2,7 +2,7 @@ import { choice, TypeSafeClient } from "@typesafe-ai/sdk";
 import { modelPage } from "./model-context.js";
 import { availableActions } from "./action-availability.js";
 import { SITES } from "./sites.js";
-import type { Observation, PlannedAction } from "./types.js";
+import type { Candidate, Observation, PlannedAction } from "./types.js";
 
 type ChoiceAnswer = { type: "choice"; choice: string; confidence: number; probabilities: Record<string, number> };
 interface JevLike { systemOne(request: unknown): Promise<{ answers: Record<string, ChoiceAnswer> }> }
@@ -34,14 +34,20 @@ export function createPlanner(client?: JevLike): { plan(input: PlanInput): Promi
       for (let i = input.history.length - 1; i >= 0 && input.history[i] === "waited"; i--) consecutiveWaits += 1;
       // Questions are evaluated independently. Keep semantic detail in shared
       // state, but give each speculative target head only compatible controls.
-      const targetCriteria = (refs: string[], unavailable: string) => {
-        const criteria: Record<string, string | null> = Object.fromEntries(refs.map(ref => [ref, null]));
+      const targetDescription = (item: Candidate) => {
+        const detail = item.field && !item.field.sensitive
+          ? [item.field.value ? `current=${JSON.stringify(item.field.value.slice(0, 80))}` : "", item.field.preferredAction ? `preferred=${item.field.preferredAction}` : ""].filter(Boolean)
+          : [];
+        return [item.label, ...detail].join(" · ").slice(0, 320);
+      };
+      const targetCriteria = (items: Candidate[], unavailable: string) => {
+        const criteria: Record<string, string> = Object.fromEntries(items.map(item => [item.ref, targetDescription(item)]));
         if (Object.keys(criteria).length < 2) Object.assign(criteria, { [unavailable]: "No compatible observed target applies", unavailable: "No second compatible target is available" });
         return criteria;
       };
-      const clickCriteria = targetCriteria(input.observation.candidates.map(item => item.ref), "no_click_target");
+      const clickCriteria = targetCriteria(input.observation.candidates, "no_click_target");
       const fillCriteria = targetCriteria(
-        input.observation.candidates.filter(item => item.field?.isText && !item.field.sensitive && item.field.preferredAction !== "click").map(item => item.ref),
+        input.observation.candidates.filter(item => item.field?.isText && !item.field.sensitive && item.field.preferredAction !== "click"),
         "no_fill_target",
       );
       const siteCriteria = {
