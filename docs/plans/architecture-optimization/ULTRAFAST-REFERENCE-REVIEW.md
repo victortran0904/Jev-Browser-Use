@@ -89,3 +89,18 @@ The active runtime still keeps the 0.30 confidence threshold, maximum two read-o
 Reviewed the exact five-file diff after the specification pass. The popup wait runs with an existing element handle inside its normal disposal scope; evaluation failures degrade to the existing bounded settle behavior rather than causing action replay. The child ARIA label is redacted by the same downstream name pipeline and is capped by the existing 220-character candidate label budget.
 
 Detached-head RED checks and active-worktree GREEN checks are preserved in terminal evidence. The complete active worktree then passed 116 Vitest tests in 29 files, 29 Node integration checks, typecheck, build, 10/10 canonical extension/relay journeys, and 10/10 additional deterministic journeys. Quality/safety self-review accepts the patch for live/public-site verification; this remains a self-review under the user's subagent waiver.
+
+
+## Public-flight date-picker follow-through
+
+The `220d507` public trace proved the airport path now works: origin autocomplete was selected, destination autocomplete was selected, and both route endpoints became visible. The remaining loop was the Departure control: Jev chose `fill_item` four times, consuming writer calls, before finally clicking the date field and becoming uncertain in the calendar.
+
+A new planner-contract test was added first and observed RED: the shared policy contained no date-picker/calendar guidance. The minimal change adds one generic rule: date/calendar fields should be clicked, then a visible requested date and required confirmation clicked; they should not be repeatedly filled as free text. The focused test is GREEN.
+
+### Specification self-review
+
+The rule is generic to date-picker/calendar interactions and contains no Google hostname, airport, date, price, DOM selector, reference ID, or forced action. It does not alter the user's goal, the 0.30 confidence floor, two pre-dispatch refreshes, 12-browser-action cap, 24-decision ceiling, public writer budget, or no-booking restrictions. Jev still chooses the operation and observed target dynamically. Specification self-review accepts this scoped change.
+
+### Code-quality/safety self-review
+
+The production diff is a single planner-policy string extension. It does not bypass operation-specific target heads or browser freshness/actionability checks. The test observes the actual external request packet rather than an internal helper. Full verification after the change passed 117 Vitest tests in 29 files, 29 Node integration checks, typecheck, production build, and `git diff --check`. Quality/safety self-review accepts the patch for a fresh exact-head public-site run.

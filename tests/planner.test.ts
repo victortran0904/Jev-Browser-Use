@@ -182,3 +182,18 @@ it("uses separate speculative target heads so fill choices contain only editable
   expect(Object.keys(captured.questions.click_target.criteria)).toEqual(expect.arrayContaining(["e1", "e2"]));
   expect(captured.questions).not.toHaveProperty("item");
 });
+
+
+it("tells the planner to use calendar controls instead of repeatedly filling date-picker fields", async () => {
+  let captured: any;
+  const planner = createPlanner({ systemOne: async request => {
+    captured = request;
+    const answer = (choice: string) => ({ type: "choice" as const, choice, confidence: 1, probabilities: { [choice]: 1 } });
+    return { answers: { kind: answer("click_item"), site: answer("no_site"), click_target: answer("e1"), fill_target: answer("no_fill_target") } };
+  } });
+  await planner.plan({ goal: "Find a flight in December", history: [], observation: {
+    id: "calendar", url: "https://example.com", title: "Flights", snapshot: "", pageText: "Departure",
+    candidates: [{ ref: "e1", label: 'textbox "Departure"', field: { label: "Departure", placeholder: "Departure", value: "", isText: true } }],
+  } });
+  expect(JSON.stringify(captured)).toMatch(/date picker.*click.*date.*confirm|calendar.*click.*date/i);
+});
