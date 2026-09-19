@@ -38,7 +38,7 @@ it('refuses an old background fill if a modal opens after planning', async () =>
 
 it('lets a clicked menu option settle for a bounded frame window before the next observation', async () => {
   const f = await browserFixture(`<input aria-label="Background search"><div role="dialog" aria-modal="true"><div role="option"
-    onclick="setTimeout(()=>document.querySelector('[role=dialog]').remove(),30)">One way</div></div>`);
+    onclick="setTimeout(()=>document.querySelector('[role=dialog]').remove(),65)">One way</div></div>`);
   try {
     let observation = await f.boundary.observe('test');
     const option = observation.candidates.find(item => item.label.includes('One way'));

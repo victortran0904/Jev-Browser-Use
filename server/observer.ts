@@ -123,7 +123,8 @@ export function createObserver(documentId: string) {
             const style = getComputedStyle(el);
             if (style.visibility === "hidden" || style.display === "none")
                 continue;
-            const name = el.getAttribute("aria-label") || el.getAttribute("placeholder") || el.getAttribute("title") || el.getAttribute("alt") || (el instanceof HTMLInputElement && !isSensitive(el) ? el.value : "") || el.innerText || el.textContent || "";
+            const childLabel = Array.from(el.children).map(child => child.getAttribute("aria-label") || "").find(Boolean) || "";
+            const name = el.getAttribute("aria-label") || el.getAttribute("placeholder") || el.getAttribute("title") || el.getAttribute("alt") || (el instanceof HTMLInputElement && !isSensitive(el) ? el.value : "") || childLabel || el.innerText || el.textContent || "";
             if (!name.trim())
                 continue;
             const type = (el.getAttribute("type") || "").toLowerCase();

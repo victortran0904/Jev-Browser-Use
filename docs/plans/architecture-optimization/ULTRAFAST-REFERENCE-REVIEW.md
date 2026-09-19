@@ -61,3 +61,31 @@ A second check was intentionally added RED: a matching results page containing o
 - `git diff --check`: passed.
 
 The ancillary-fare verifier changed after the full browser pass; its focused integration file was rerun separately with all four cases passing. It does not alter browser execution.
+
+## Date-picker accessible naming
+
+A pending generic observer improvement was isolated before inclusion. Against the pushed base, a clickable wrapper containing visual text `8` and a child `aria-label="Tuesday, December 8, 2026"` was observed only as `button "8"` (focused test exit 1). The minimal collector change prefers a direct child's ARIA label before terse inner text; the same real-browser test then passed.
+
+This keeps element identity, visibility, redaction, candidate bounds and action-time freshness unchanged. It is useful for calendar widgets such as Google Flights without hardcoding dates or site selectors.
+
+
+## Final TDD follow-through after reference comparison
+
+Two pending generic browser behaviors were reproduced against pushed head `4bf22cf` in a detached worktree before inclusion:
+
+- Calendar wrapper naming: the observer returned only `button "8"` for a wrapper whose direct child exposed `aria-label="Tuesday, December 8, 2026"`; focused test exited 1. The minimal child-label fallback made the same real-browser test GREEN.
+- Popup-choice settling: a menu option whose dialog closed 65 ms after click was followed by an observation that still contained the modal; focused test exited 1. A popup-specific bounded disappearance wait made the same real-browser test GREEN.
+
+Neither behavior contains Google-specific selectors, airport names, dates, prices, or scripted actions. The pre-existing 50 ms/two-frame settle remains for ordinary clicks; only observed popup choices use the bounded owner/target disappearance check.
+
+### Final specification self-review
+
+The descendant-label fallback improves the model-visible accessible name without changing identity, visibility, candidate limits, redaction, freshness, or actionability. Popup settling occurs only after an already executed click; it does not replay or authorize another action. It waits for the clicked popup choice or its owning popup to disappear and remains bounded.
+
+The active runtime still keeps the 0.30 confidence threshold, maximum two read-only pre-dispatch refreshes, maximum 12 browser actions, eight writer calls in the public harness, and the no-booking/payment/account restrictions. The separate 24-decision ceiling only allows additional observations/plans and does not expand browser mutation authority. Specification self-review accepts this patch.
+
+### Final code-quality/safety self-review
+
+Reviewed the exact five-file diff after the specification pass. The popup wait runs with an existing element handle inside its normal disposal scope; evaluation failures degrade to the existing bounded settle behavior rather than causing action replay. The child ARIA label is redacted by the same downstream name pipeline and is capped by the existing 220-character candidate label budget.
+
+Detached-head RED checks and active-worktree GREEN checks are preserved in terminal evidence. The complete active worktree then passed 116 Vitest tests in 29 files, 29 Node integration checks, typecheck, build, 10/10 canonical extension/relay journeys, and 10/10 additional deterministic journeys. Quality/safety self-review accepts the patch for live/public-site verification; this remains a self-review under the user's subagent waiver.

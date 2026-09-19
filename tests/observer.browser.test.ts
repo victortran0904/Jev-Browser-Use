@@ -100,3 +100,13 @@ describe("real-browser observation", () => {
   });
 
 });
+
+it('uses a descendant accessible label when a clickable wrapper has only a terse visual label', async () => {
+  const f = await browserFixture('<div role="button"><div aria-label="Tuesday, December 8, 2026">8</div></div>');
+  try {
+    const observation = await f.boundary.observe('test');
+    expect(observation.candidates).toEqual(expect.arrayContaining([
+      expect.objectContaining({ label: 'button "Tuesday, December 8, 2026"' }),
+    ]));
+  } finally { await f.close(); }
+}, 15000);
