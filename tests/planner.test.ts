@@ -255,3 +255,20 @@ it("tells the planner to navigate a calendar when the requested month is not yet
   } });
   expect(captured.state.policy).toMatch(/(?:requested|target).*(?:month|date).*(?:not|isn.t).*(?:visible|current).*(?:Next|Previous)|(?:Next|Previous).*until.*(?:month|date)/i);
 });
+
+
+it("requires conflicting requested controls to be resolved before Search or Submit", async () => {
+  let captured: any;
+  const planner = createPlanner({ systemOne: async request => {
+    captured = request;
+    const answer = (choice: string) => ({ type: "choice" as const, choice, confidence: 1, probabilities: { [choice]: 1 } });
+    return { answers: { kind: answer("click_item"), site: answer("no_site"), click_target: answer("e1"), fill_target: answer("no_fill_target") } };
+  } });
+  await planner.plan({ goal: "Find one-way flights", history: [], observation: {
+    id: "settings", url: "https://example.com", title: "Flights", snapshot: "", pageText: "Round trip Search",
+    candidates: [{ ref: "e1", label: 'button "Search"' }, { ref: "e2", label: 'combobox "Round trip"' }],
+  } });
+  const packet = JSON.stringify(captured);
+  expect(packet).toMatch(/requested.*control.*before.*search|search.*requested.*control/i);
+  expect(packet).toMatch(/conflict.*goal|conflicting/i);
+});
