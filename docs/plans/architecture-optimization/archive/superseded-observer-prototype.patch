@@ -1,0 +1,104 @@
+diff --git a/e2e/browsing.mjs b/e2e/browsing.mjs
+index dc83715..1301ed3 100644
+--- a/e2e/browsing.mjs
++++ b/e2e/browsing.mjs
+@@ -35,7 +35,13 @@ cases.push(['01-fast-focus', async id => {
+   }
+   const median = durations.sort((a,b) => a-b)[1];
+   assert(median < 900, `Ordinary focus click median ${Math.round(median)}ms still pays a popup deadline`);
+-  return { focusClickMedianMs: Math.round(median) };
++  await boundary.observe(id);
++  const cached = await boundary.observe(id);
++  assert.equal(cached.metrics?.mode, 'focused', 'Unchanged pages should reuse their validated candidate collection');
++  assert.equal(cached.metrics.elementsInspected, 0);
++  await boundary.act(id, { kind: 'type_text', value: 'Fresh value', observationId: cached.id }, cached);
++  assert.equal((await boundary.observe(id)).focusedField?.value, 'Fresh value');
++  return { focusClickMedianMs: Math.round(median), cachedObservation: true, currentFieldValue: true };
+ }]);
+ 
+ for (const file of (await readdir(new URL('./cases/', import.meta.url))).filter(n => n.endsWith('.mjs')).sort()) {
+diff --git a/server/browser.ts b/server/browser.ts
+index 2fa149b..0b8e536 100644
+--- a/server/browser.ts
++++ b/server/browser.ts
+@@ -131,7 +131,7 @@ export function createBrowserBoundary(
+           }
+         }
+         ${screenshotSnippet}
+-        return { ...dom, url: page.url(), title: await page.title() };
++        return dom;
+       `;
+       const root = `jev-${runId}`;
+       if (closed.has(root)) throw new Error("Browser run is closed");
+diff --git a/server/observer.ts b/server/observer.ts
+index cc5bf72..d631096 100644
+--- a/server/observer.ts
++++ b/server/observer.ts
+@@ -8,8 +8,30 @@ export function collectObservation() {
+               const metadata = ["type", "autocomplete", "name", "id", "aria-label"].map(name => el.getAttribute(name) || "").join(" ").toLowerCase();
+               return /password|passcode|one-time-code|cc-|credit.?card|card.?number|security.?code|\bcvv\b|\bcvc\b|\botp\b/.test(metadata);
+             };
+-            const host = window as unknown as { __jevRefs?: { ids: WeakMap<Element, string>; next: number; nodes: Map<string, HTMLElement>; documentId: string } };
+-            const registry = host.__jevRefs ?? (host.__jevRefs = { ids: new WeakMap(), next: 0, nodes: new Map(), documentId: Array.from(crypto.getRandomValues(new Uint32Array(4))).join("-") });
++            const host = window as unknown as { __jevRefs?: { ids: WeakMap<Element, string>; next: number; nodes: Map<string, HTMLElement>; documentId: string; observer?: MutationObserver; dirty?: boolean; cachedAt?: number; cache?: { candidates: { ref: string; label: string }[]; pageText: string }; } };
++            const registry: NonNullable<typeof host.__jevRefs> = host.__jevRefs ?? (host.__jevRefs = { ids: new WeakMap(), next: 0, nodes: new Map(), documentId: Array.from(crypto.getRandomValues(new Uint32Array(4))).join("-") });
++            const el = document.activeElement;
++            let focusedField = null;
++            if (el && el instanceof HTMLElement && el !== document.body) {
++              const tag = el.tagName.toLowerCase();
++              const role = el.getAttribute("role") || "";
++              const isText = !isSensitive(el) && (tag === "textarea" || (tag === "input" && !["button", "submit", "checkbox", "radio", "file", "hidden"].includes((el.getAttribute("type") || "text").toLowerCase())) || role === "textbox" || role === "searchbox" || el.isContentEditable);
++              focusedField = { label: el.getAttribute("aria-label") || el.getAttribute("name") || el.getAttribute("id") || "", placeholder: el.getAttribute("placeholder") || "", value: isSensitive(el) ? "" : "value" in el ? String((el as HTMLInputElement).value || "").slice(0, 300) : String(el.textContent || "").slice(0, 300), isText };
++            }
++            if (!registry.observer) {
++              const invalidate = () => { registry.dirty = true; };
++              registry.observer = new MutationObserver(invalidate);
++              registry.observer.observe(document, { subtree: true, childList: true, attributes: true, characterData: true });
++              for (const event of ["scroll", "resize", "focusin", "focusout", "input", "change", "load", "transitionrun", "animationstart"]) window.addEventListener(event, invalidate, true);
++              document.fonts?.addEventListener("loadingdone", invalidate);
++              registry.dirty = true;
++            }
++            if (registry.observer.takeRecords().length) registry.dirty = true;
++            if (registry.cache && !registry.dirty && performance.now() - (registry.cachedAt ?? 0) < 1000 && !document.getAnimations().some(a => a.playState === "running")) {
++              return { documentId: registry.documentId, ...registry.cache, focusedField,
++                url: location.href, title: document.title,
++                metrics: { elementsInspected: 0, domExtractMs: performance.now() - started, mode: "focused" as const } };
++            }
+             const selector = "a,button,input,textarea,select,[role=button],[role=link],[role=textbox],[role=searchbox],[contenteditable=true]";
+             const elements = Array.from(document.querySelectorAll<HTMLElement>(selector)).filter((el) => {
+               if (accepted >= 180 || !(el instanceof HTMLElement)) return false;
+@@ -33,15 +55,12 @@ export function collectObservation() {
+               const name = el.getAttribute("aria-label") || el.getAttribute("placeholder") || el.getAttribute("title") || el.getAttribute("alt") || (el instanceof HTMLInputElement && !isSensitive(el) ? el.value : "") || el.innerText || el.textContent || "";
+               return { ref, label: (role + " " + JSON.stringify(String(name).replace(/\s+/g, " ").trim().slice(0, 220))).trim() };
+             });
+-            const el = document.activeElement;
+-            let focusedField = null;
+-            if (el && el instanceof HTMLElement && el !== document.body) {
+-              const tag = el.tagName.toLowerCase();
+-              const role = el.getAttribute("role") || "";
+-              const isText = !isSensitive(el) && (tag === "textarea" || (tag === "input" && !["button", "submit", "checkbox", "radio", "file", "hidden"].includes((el.getAttribute("type") || "text").toLowerCase())) || role === "textbox" || role === "searchbox" || el.isContentEditable);
+-              focusedField = { label: el.getAttribute("aria-label") || el.getAttribute("name") || el.getAttribute("id") || "", placeholder: el.getAttribute("placeholder") || "", value: isSensitive(el) ? "" : "value" in el ? String((el as HTMLInputElement).value || "").slice(0, 300) : String(el.textContent || "").slice(0, 300), isText };
+-            }
+-            return { documentId: registry.documentId, metrics: { elementsInspected, domExtractMs: performance.now() - started }, candidates, focusedField, pageText: String(document.body?.innerText || "").replace(/\n{3,}/g, "\n\n").slice(0, 12000) };
++            const pageText = String(document.body?.innerText || "").slice(0, 12000);
++            registry.cache = { candidates, pageText };
++            registry.dirty = false; registry.cachedAt = performance.now();
++            return { documentId: registry.documentId, candidates, focusedField, pageText,
++              url: location.href, title: document.title,
++              metrics: { elementsInspected, domExtractMs: performance.now() - started, mode: "full" as const } };
+ }
+ 
+ // tsx may emit a harmless __name helper; supply it inside the page, not from Node.
+diff --git a/server/types.ts b/server/types.ts
+index 44fb1ac..dc1a8c2 100644
+--- a/server/types.ts
++++ b/server/types.ts
+@@ -2,7 +2,7 @@ export type RunStatus = "idle" | "running" | "complete" | "error";
+ export type ActionKind = "open_site" | "click_item" | "type_text" | "press_enter" | "press_escape" | "scroll_down" | "scroll_up" | "back" | "wait" | "done" | "none";
+ export interface Candidate { ref: string; label: string }
+ export interface FocusedField { label: string; placeholder: string; value: string; isText: boolean }
+-export interface Observation { id: string; documentId?: string; metrics?: { elementsInspected: number; domExtractMs: number }; snapshot: string; candidates: Candidate[]; url: string; title: string; focusedField?: FocusedField; screenshotUrl?: string }
++export interface Observation { id: string; documentId?: string; metrics?: { elementsInspected: number; domExtractMs: number; mode?: "full" | "focused" }; snapshot: string; candidates: Candidate[]; url: string; title: string; focusedField?: FocusedField; screenshotUrl?: string }
+ export interface PlannedAction { kind: ActionKind; target?: string; site?: string; url?: string; value?: string; observationId: string; confidence?: number; probabilities?: Record<string, number> }
+ export interface RunEvent { id: number; type: string; at: string; message: string; data?: Record<string, unknown> }
+ export interface PhaseTimings { observeMs?: number; planMs?: number; actMs?: number; totalMs?: number }

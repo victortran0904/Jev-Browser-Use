@@ -1,3 +1,4 @@
+import { InvalidActionTargetError, StaleObservationError } from "./browser-errors.js";
 import path from "node:path";
 import { rm } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
@@ -6,7 +7,7 @@ import { browserBoundary } from "./browser.js";
 import { planner as defaultPlanner } from "./planner.js";
 import { narrator as defaultNarrator, type Narrator } from "./narrator.js";
 import { SITES } from "./sites.js";
-import type { PlannedAction, Run, RunEvent } from "./types.js";
+import type { Observation, PlannedAction, Run, RunEvent } from "./types.js";
 import { extractExplicitUrl } from "./urls.js";
 import { writer as defaultWriter, type Writer } from "./writer.js";
 
@@ -43,19 +44,27 @@ export function createRunController(deps: RunControllerOptions = {}) {
   async function loop(run: Run): Promise<void> {
     const history: string[] = [];
     let consecutiveNoops = 0;
+    let preDispatchRecoveries = 0;
+    let browserActionCount = 0;
+    let pendingObservation: Observation | undefined;
+    let pendingObserveMs = 0;
     let lastResult = "";
     let lastState = "";
     try {
-      while (run.stepCount < 12 && !run.stopped) {
-        const stepStart = Date.now();
-        const screenshotPath = enableScreenshots ? path.resolve(".runs", run.id, "screenshot.png") : undefined;
-        run.screenshotPath = screenshotPath;
+      while (run.stepCount < 24 && !run.stopped) {
+        const stepStart = performance.now();
+        const screenshotPath = enableScreenshots ? path.resolve(".runs", run.id, String(run.stepCount), "screenshot.png") : undefined;
 
-        const observeStart = Date.now();
-        const observation = await browser.observe(run.id, screenshotPath);
-        const observeMs = Date.now() - observeStart;
+        const observeStart = performance.now();
+        const initialUrl = run.stepCount === 0 ? extractExplicitUrl(run.goal) : null;
+        const observation: Observation = pendingObservation
+          ?? (initialUrl ? { id: randomUUID(), url: "about:blank", title: "Neutral session", snapshot: "", pageText: "", candidates: [] } : await browser.observe(run.id, screenshotPath));
+        const observeMs = pendingObservation ? pendingObserveMs : performance.now() - observeStart;
+        pendingObservation = undefined;
+        pendingObserveMs = 0;
         if (run.stopped || run.status !== "running") return;
         run.observation = observation;
+        run.screenshotPath = initialUrl ? undefined : screenshotPath;
         emit(run, "observation", `Observed ${observation.title || observation.url || "page"}`, {
           observationId: observation.id,
           url: observation.url,
@@ -63,6 +72,8 @@ export function createRunController(deps: RunControllerOptions = {}) {
           screenshotUrl: observation.screenshotUrl,
           durationMs: observeMs,
           phase: "observe",
+          metrics: observation.metrics,
+          synthetic: Boolean(initialUrl),
         });
 
         // Optimization 4: Parse explicit URLs directly without a model call
@@ -88,9 +99,9 @@ export function createRunController(deps: RunControllerOptions = {}) {
             phase: "plan",
           });
         } else {
-          const planStart = Date.now();
+          const planStart = performance.now();
           action = await planner.plan({ goal: run.goal, history, observation });
-          planMs = Date.now() - planStart;
+          planMs = performance.now() - planStart;
           if (run.stopped || run.status !== "running") return;
           run.stepCount += 1;
           emit(run, "plan", `Jev chose ${action.kind}`, {
@@ -98,7 +109,25 @@ export function createRunController(deps: RunControllerOptions = {}) {
             durationMs: planMs,
             phase: "plan",
           });
-          if ((action.confidence ?? 1) < 0.3) {
+          const passiveAction = ["press_escape", "wait", "scroll_down", "scroll_up"].includes(action.kind);
+          if ((action.confidence ?? 1) < 0.3 && !passiveAction) {
+            const refreshStart = performance.now();
+            const refreshed = await browser.observe(run.id, screenshotPath);
+            const refreshedMs = performance.now() - refreshStart;
+            const stateKey = (value: Observation) => JSON.stringify({
+              documentId: value.documentId, url: value.url, snapshot: value.snapshot,
+              focusedValue: value.focusedField?.value ?? "", focusedLabel: value.focusedField?.label ?? "",
+            });
+            if (stateKey(refreshed) !== stateKey(observation) && ++preDispatchRecoveries <= 2) {
+              pendingObservation = refreshed;
+              pendingObserveMs = refreshedMs;
+              history.push("Page changed while the decision was uncertain; no action was sent. Replan from the fresh observation.");
+              emit(run, "state_refresh", "Page changed before a low-confidence action; replanning", {
+                observationId: observation.id, kind: action.kind, dispatched: false,
+                attempt: preDispatchRecoveries, confidence: action.confidence ?? 0, phase: "observe",
+              });
+              continue;
+            }
             run.status = "error";
             run.error = `Jev confidence ${(action.confidence ?? 0).toFixed(2)} was below 0.30`;
             emit(run, "run_error", run.error);
@@ -111,32 +140,70 @@ export function createRunController(deps: RunControllerOptions = {}) {
           }
         }
 
-        const actStart = Date.now();
-        let result: string;
-        if (action.kind === "open_site") {
-          const knownUrl = action.site ? SITES[action.site] : "";
-          const explicitUrl = extractExplicitUrl(run.goal);
-          const url = action.url || knownUrl || (action.site === "other" ? (explicitUrl ?? await writer.generateUrl({ goal: run.goal, history })) : explicitUrl);
-          result = url ? await browser.open(run.id, url) : "open_site refused: no catalog site matched and the writer supplied no valid URL";
-        } else if (action.kind === "type_text") {
-          if (!observation.focusedField?.isText) result = "type_text refused: no browser text field is focused";
-          else {
-            const generated = await writer.generateText({ goal: run.goal, history, observation });
-            if (!generated.fill || !generated.text) result = `type_text refused: ${generated.reason || "writer declined"}`;
-            else result = await browser.act(run.id, { ...action, value: generated.text }, observation);
-          }
-        } else {
-          result = await browser.act(run.id, action, observation);
+        if (browserActionCount >= 18) {
+          run.status = "error";
+          run.error = "Reached the 18-browser-action limit before the goal was complete";
+          emit(run, "run_error", run.error);
+          return;
         }
 
-        const actMs = Date.now() - actStart;
-        const totalStepMs = Date.now() - stepStart;
-        run.timings = { observeMs, planMs, actMs, totalMs: totalStepMs };
+        const actStart = performance.now();
+        let writerMs = 0;
+        let browserActionExecuted = false;
+        const timeWriter = async <T>(work: () => Promise<T>): Promise<T> => {
+          const start = performance.now();
+          try { return await work(); } finally { writerMs += performance.now() - start; }
+        };
+        let result: string;
+        try {
+          if (action.kind === "open_site") {
+            const knownUrl = action.site ? SITES[action.site] : "";
+            const explicitUrl = extractExplicitUrl(run.goal);
+            const url = action.url || knownUrl || (action.site === "other" ? (explicitUrl ?? await timeWriter(() => writer.generateUrl({ goal: run.goal, history }))) : explicitUrl);
+            if (run.stopped || run.status !== "running") return;
+            if (url) {
+              result = await browser.open(run.id, url);
+              browserActionExecuted = true;
+            } else result = "open_site refused: no catalog site matched and the writer supplied no valid URL";
+          } else if (action.kind === "type_text" || action.kind === "fill_item") {
+            const field = action.kind === "fill_item" ? observation.candidates.find(item => item.ref === action.target)?.field : observation.focusedField;
+            if (!field?.isText || field.sensitive) result = "type_text refused: no browser text field is focused";
+            else {
+              const generated = await timeWriter(() => writer.generateText({ goal: run.goal, history, observation: { ...observation, focusedField: field } }));
+              if (run.stopped || run.status !== "running") return;
+              if (!generated.fill || !generated.text) result = `type_text refused: ${generated.reason || "writer declined"}`;
+              else {
+                result = await browser.act(run.id, { ...action, value: generated.text }, observation);
+                browserActionExecuted = true;
+              }
+            }
+          } else {
+            result = await browser.act(run.id, action, observation);
+            browserActionExecuted = true;
+          }
+        } catch (error) {
+          if (!(error instanceof StaleObservationError) && !(error instanceof InvalidActionTargetError)) throw error;
+          if (run.stopped || run.status !== "running") return;
+          if (++preDispatchRecoveries > 2) throw error;
+          history.push("Action rejected before dispatch; no action was sent. Observe again and select a valid current target.");
+          emit(run, "state_refresh", "Action rejected before dispatch; observing again", {
+            observationId: observation.id, kind: action.kind, dispatched: false, attempt: preDispatchRecoveries, phase: "observe",
+          });
+          continue;
+        }
+
+        if (run.stopped || run.status !== "running") return;
+        if (browserActionExecuted && !["wait", "scroll_down", "scroll_up", "press_escape"].includes(action.kind)) browserActionCount += 1;
+        const actMs = performance.now() - actStart;
+        const browserMs = Math.max(0, actMs - writerMs);
+        const totalStepMs = performance.now() - stepStart;
+        run.timings = { observeMs, planMs, actMs, writerMs, browserMs, totalMs: totalStepMs };
 
         history.push(result);
         emit(run, "action", result, {
           action,
           durationMs: actMs,
+          writerMs, browserMs,
           phase: "act",
           stepDurationMs: totalStepMs,
         });
@@ -155,7 +222,7 @@ export function createRunController(deps: RunControllerOptions = {}) {
       }
       if (run.stopped) return;
       run.status = "error";
-      run.error = "Reached the 12-step limit before the goal was complete";
+      run.error = "Reached the 24-decision limit before the goal was complete";
       emit(run, "run_error", run.error);
     } catch (error) {
       if (run.stopped) return;

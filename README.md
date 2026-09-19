@@ -50,10 +50,10 @@ Open [http://localhost:8787](http://localhost:8787).
 ## Safety model
 
 - The browser exposes at most 180 currently visible interactive DOM elements to Jev; there is no OCR.
-- Actions are limited to open site, click item, type text, Enter/Escape, scroll, back, wait, done, or none.
+- Actions are limited to open site, click item, fill an observed field, type text, Enter/Escape, scroll, back, wait, done, or none.
 - Jev only classifies bounded choices. Gemini may generate one validated HTTPS URL or the text for an already-focused browser field.
 - Action refs are bound to the current observation so stale actions fail closed.
-- Concrete action results feed the next decision. Runs stop on `done`, `none`, low confidence, two repeated/no-op actions, 12 steps, or immediately via **Stop**.
+- Concrete action results feed the next decision. Runs stop on `done`, `none`, low confidence, six repeated/no-op actions, 12 steps, or immediately via **Stop**.
 - Page text is treated as untrusted state, never as instructions.
 
 ## Commands
@@ -67,3 +67,23 @@ npm run browser:extension-path
 ```
 
 Run state is memory-only. Latest per-run screenshots live under `.runs/` and are ignored by Git. This app is intentionally local-only and has no deployment configuration.
+
+## Architecture regression tests
+
+`npm ci` applies a version-checked compatibility fix to Browser Control 0.7.1 so native popup tabs retain their Jev run's ownership. **After updating an existing installation, reload the unpacked Browser Control extension and restart its relay**; an already-running extension does not pick up the changed background script automatically. No additional Chrome extension permissions are requested.
+
+Install the test browser, then run the regression and real-relay suites:
+
+```bash
+node node_modules/playwright-core/cli.js install --with-deps --no-shell chromium
+npm test -- --maxWorkers=2
+npm run typecheck
+npm run build
+npm run test:e2e:relay
+```
+
+The ten real-relay workflows cover ordinary input, native POST popups, delayed popup state, redirects, form submission/back navigation, dialogs, scrolling/dynamic content, stale targets, concurrent-run isolation/cleanup, and a synthetic Hanoi-to-Vancouver flight form. They do not require model keys and never purchase anything. The separate GitHub Actions live test uses repository secrets and reports the exact public flight prompt independently; fixture success is not proof of a live fare.
+
+Browser input activates only the run-owned tab and is serialized across runs sharing the same transport, because Chrome has one active tab/cursor. `createBrowserBoundary(command, { activateTargetBeforeAction: false })` preserves background-only behavior at the cost of background-tab actionability delays.
+
+Observations now carry stable document-scoped references, bounded page context, safe direct-fill field metadata, and full/incremental/focused collection metrics. Cache reuse does not skip current geometry or field-value checks. Ambiguous execution outcomes are not replayed. The agent still requires fresh page evidence for completion and retains its default 12-step limit.

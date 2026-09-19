@@ -1,0 +1,76 @@
+name: Oracle VPS acceptance
+on:
+  push:
+    branches: [perf/browser-architecture-20260917]
+  workflow_dispatch:
+    inputs:
+      scope:
+        description: Verification scope (full is required for final acceptance)
+        type: choice
+        options: [full, public-flight]
+        default: full
+permissions:
+  contents: read
+concurrency:
+  group: oracle-vps-acceptance
+  cancel-in-progress: false
+jobs:
+  oracle-free:
+    if: github.repository == 'victortran0904/Jev-Browser-Use' && github.actor == 'victortran0904' && github.ref == 'refs/heads/perf/browser-architecture-20260917' && (github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[vps-verify]'))
+    # Unique, non-default label on a one-job runner. Never route PR/fork jobs here.
+    runs-on: [jev-final-acceptance-20260917-reconciled]
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+          ref: ${{ github.sha }}
+      - name: Verify requested machine and Node runtime
+        run: |
+          test "$(hostname -s)" = free
+          node --input-type=module -e 'if (Number(process.versions.node.split(".")[0]) !== 22) throw Error("Expected provisioned Node 22"); console.log("Oracle Linux ARM64; Node " + process.versions.node)'
+      - run: npm ci
+      # Avoid concurrent Chromium startup contention on the shared Oracle VPS.
+      # Keep application assertions and explicit performance thresholds unchanged.
+      - if: inputs.scope != 'public-flight'
+        run: npm test -- --maxWorkers=1
+      - if: inputs.scope != 'public-flight'
+        run: node --import tsx --test --test-concurrency=1 integration/*.checks.mjs
+      - if: inputs.scope != 'public-flight'
+        run: npm run typecheck
+      - if: inputs.scope != 'public-flight'
+        run: npm run build
+      - name: Ten canonical workflows through real Chromium, extension and relay
+        if: inputs.scope != 'public-flight'
+        id: browser
+        run: npm run test:e2e:relay
+      - name: Ten additional merged browser journeys
+        if: inputs.scope != 'public-flight'
+        run: node --import tsx .github/scripts/architecture-e2e.mjs --deterministic
+      - name: Ten journeys with live Jev and Gemini
+        if: inputs.scope != 'public-flight'
+        id: live
+        env:
+          GEMINI_KEY: ${{ secrets.GEMINI_KEY }}
+          TYPESAFE_API_KEY: ${{ secrets.TYPESAFE_API_KEY }}
+          ENABLE_SCREENSHOTS: 'false'
+        run: node --import tsx .github/scripts/architecture-e2e.mjs --live
+      - name: Exact user flight prompt, public websites, no booking
+        if: always() && (steps.browser.outcome == 'success' || inputs.scope == 'public-flight')
+        env:
+          GEMINI_KEY: ${{ secrets.GEMINI_KEY }}
+          TYPESAFE_API_KEY: ${{ secrets.TYPESAFE_API_KEY }}
+          ENABLE_SCREENSHOTS: 'false'
+        run: node --import tsx .github/scripts/architecture-e2e.mjs --public-flight
+      - name: Upload selected result metadata only
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
+        with:
+          name: oracle-vps-${{ github.sha }}-attempt-${{ github.run_attempt }}
+          path: |
+            .ci-results/browsing.json
+            .ci-results/architecture-deterministic.json
+            .ci-results/architecture-live.json
+            .ci-results/architecture-public-flight.json
+          if-no-files-found: warn
+          retention-days: 7

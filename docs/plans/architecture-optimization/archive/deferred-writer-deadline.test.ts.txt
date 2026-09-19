@@ -1,0 +1,38 @@
+// NOT IMPLEMENTED: experimental per-attempt deadline, not an active passing test.
+// Implementation command was blocked before execution; original RED evidence retained.
+import { afterEach, expect, it, vi } from 'vitest';
+import { createWriter } from '../server/writer.js';
+
+const observation = {
+  id: 'writer-test', url: 'https://example.com', title: 'Search', snapshot: '', candidates: [],
+  focusedField: { label: 'Origin', placeholder: '', value: '', isText: true },
+};
+afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
+function providerResponse(text: string) {
+  vi.stubEnv('GEMINI_KEY', 'synthetic-test-key');
+  vi.stubGlobal('fetch', async () => Response.json({
+    candidates: [{ content: { role: 'model', parts: [{ text }] }, finishReason: 'STOP' }],
+  }));
+}
+
+
+it('bounds a stalled writer to two 15-second attempts and aborts each request', async () => {
+  vi.useFakeTimers();
+  vi.stubEnv('GEMINI_KEY', 'synthetic-test-key');
+  let requests = 0, aborts = 0, finished = false;
+  vi.stubGlobal('fetch', async (_input: unknown, init: RequestInit) => {
+    requests++;
+    return new Promise<Response>((_resolve, reject) => {
+      init.signal?.addEventListener('abort', () => { aborts++; reject(init.signal?.reason); }, { once: true });
+    });
+  });
+  const result = createWriter().generateText({ goal: 'Search', history: [], observation })
+    .then(value => { finished = true; return value; }, error => { finished = true; return error; });
+  try {
+    await vi.advanceTimersByTimeAsync(30_010);
+    expect(finished).toBe(true);
+    expect(requests).toBe(2);
+    expect(aborts).toBe(2);
+    await expect(result).resolves.toMatchObject({ name: 'TimeoutError' });
+  } finally { vi.useRealTimers(); }
+});

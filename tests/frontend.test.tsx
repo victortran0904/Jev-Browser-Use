@@ -92,8 +92,11 @@ describe("agent console", () => {
     expect(await screen.findByRole("status", { name: /solving/i })).toBeVisible();
     expect(fetch).toHaveBeenCalledTimes(1); // initial mount refresh only
 
+    // Rendering the running status can precede installation of the SSE effect.
+    // Wait for the external event listener instead of silently dropping the event.
+    await waitFor(() => expect(messageListener).toBeTypeOf("function"));
     act(() => {
-      messageListener?.({
+      messageListener!({
         data: JSON.stringify({
           id: 1,
           type: "action",

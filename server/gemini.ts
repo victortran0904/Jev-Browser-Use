@@ -15,6 +15,9 @@ export async function withGeminiFallback<T>(generate: (model: string) => Promise
   try {
     return await generate(primary);
   } catch (error) {
+    // This retries model inference only. Never wrap a browser mutation here.
+    // A caller cancellation (AbortError) is deliberately not a retry signal.
+    if (error instanceof Error && error.name === "TimeoutError") return generate(primary);
     const fallback = geminiFallbackModel();
     if (!isTemporaryGeminiError(error) || fallback === primary) throw error;
     return generate(fallback);

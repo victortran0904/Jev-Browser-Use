@@ -1,0 +1,162 @@
+# jev-ultrafast follow-through review — September 19, 2026
+
+Reference inspected: `browser-use/jev-ultrafast`, linked by Gregor Zunic's X post. This is a design reference, not copied wholesale. The user waived subagents but retained TDD plus specification review followed by quality/safety review.
+
+## Observed reference patterns
+
+The reference's recorded Google Flights example uses 17 Jev decisions for 11 browser actions. It gives click/type/select operations separate speculative target heads, treats a typed autocomplete query as incomplete until a visible suggestion is selected, waits briefly for relevant UI state after input/click, and separates model-decision budget from browser-action budget.
+
+Our preceding public trace stopped after typing an airport because no option was visible and Jev proposed Enter at 0.25 confidence. The 0.30 threshold correctly prevented dispatch.
+
+## Vertical RED/GREEN cycles
+
+| Behavior | RED | Minimal correction | GREEN |
+| --- | --- | --- | --- |
+| Low-confidence action while page changes | archived test reproduced terminal error | re-observe read-only; replan only when state actually changed, max two refreshes | focused test passes; low-confidence action never dispatched |
+| Delayed autocomplete option | option delayed 500 ms was absent | combobox readiness waits for a visible owned option within existing bounded readiness window | option observed before next decision |
+| Operation-specific target selection | planner expected missing generic `item` head | separate `click_target` and editable-only `fill_target` heads | fill action selects only editable ref |
+| Model-vs-browser budget | 14-decision/12-action dynamic flow hit old 12-step ceiling | allow 24 decisions while hard-capping browser actions at 12 | dynamic flow completes; separate preservation test blocks action 13 |
+| Post-click modal transition | next observation still saw disappearing modal | wait at most two animation frames or 50 ms | fresh background state observed |
+
+The public-flight harness now mirrors the 24-decision ceiling while retaining the runtime's 12-browser-action cap and eight writer-call limit.
+
+## Stage 1 — specification self-review
+
+The changes address the observed failure mode without lowering the confidence threshold, forcing an action, scripting flight-specific targets, increasing browser mutations, or permitting booking/account/payment actions. Low-confidence recovery performs only an observation and requires a changed state before replanning. If the state is unchanged, confidence below 0.30 remains terminal.
+
+Operation-specific target heads stay in one TypeSafe request and use the already allowlisted shared control semantics. The fill head contains only editable non-sensitive fields; action-time freshness and actionability remain mandatory.
+
+The decision/action split increases reasoning opportunities, not browser authority: no more than 12 browser boundary actions can execute. The public test can ask up to 24 planning questions but still cannot exceed that production action cap.
+
+Flight-result evidence now accepts the real Google Flights rendering pattern where route/date state and fare are split across DOM text/controls, but only in explicit result context with the searched route/date and a CAD fare below 2500. Existing negative currency/limit tests remain.
+
+Specification self-review: accepted for the public flight-search goal and original architecture constraints, pending clean full verification and fresh secret-backed execution.
+
+## Stage 2 — code-quality and safety self-review
+
+Reviewed the complete production diff after the specification pass. The autocomplete wait is conditional on declared editor semantics; ordinary text fields do not pay the delay. The click settle is bounded by two animation frames or 50 ms and does not replace navigation readiness. Neither path repeats input.
+
+Low-confidence state comparison includes document identity, URL, snapshot, focused label, and focused value. It is capped by the same two pre-dispatch recoveries and cannot convert an ambiguous transport/action outcome into a retry.
+
+Target-head compatibility retains the old `item` response only for existing injected test clients; real requests use the new operation-specific heads. Missing selected target responses fail closed.
+
+Browser-action accounting increments only after a successful `open` or `act`; writer refusals, uncertain decisions, and pre-dispatch rejections do not consume a browser action. The 13th action is blocked before dispatch. No dependency, secret scope, model selection, booking policy, or screenshot behavior changed.
+
+Quality/safety self-review: accepted, subject to the exact-head regression/browser/live/public-flight results recorded after this document.
+
+## Fare-evidence hardening
+
+The existing real-result verifier was also updated for the observed Google Flights rendering where route/date controls and result prices are separate DOM text. The first new check confirms that a search-result page with Hanoi, Vancouver, a December 2026 departure and a visible CAD fare below the cap is accepted.
+
+A second check was intentionally added RED: a matching results page containing only baggage/seat prices incorrectly qualified. The verifier now excludes baggage, seat-selection, insurance, ancillary and optional-charge lines; that test is GREEN. This preserves the rule that unrelated cheap amounts are not flight-fare evidence.
+
+## Clean local verification after all production changes
+
+- Vitest: **115 tests in 29 files passed**.
+- Node integration suite: **28 checks passed**.
+- Typecheck and production build: passed.
+- Real Browser Control extension/relay canonical journeys: **10/10 passed**.
+- Additional deterministic browser journeys: **10/10 passed**.
+- Controlled fixture timings in this pass: 179 ms focus-click median, 150 ms redirect navigation, 240 ms Back recovery.
+- `git diff --check`: passed.
+
+The ancillary-fare verifier changed after the full browser pass; its focused integration file was rerun separately with all four cases passing. It does not alter browser execution.
+
+## Date-picker accessible naming
+
+A pending generic observer improvement was isolated before inclusion. Against the pushed base, a clickable wrapper containing visual text `8` and a child `aria-label="Tuesday, December 8, 2026"` was observed only as `button "8"` (focused test exit 1). The minimal collector change prefers a direct child's ARIA label before terse inner text; the same real-browser test then passed.
+
+This keeps element identity, visibility, redaction, candidate bounds and action-time freshness unchanged. It is useful for calendar widgets such as Google Flights without hardcoding dates or site selectors.
+
+
+## Final TDD follow-through after reference comparison
+
+Two pending generic browser behaviors were reproduced against pushed head `4bf22cf` in a detached worktree before inclusion:
+
+- Calendar wrapper naming: the observer returned only `button "8"` for a wrapper whose direct child exposed `aria-label="Tuesday, December 8, 2026"`; focused test exited 1. The minimal child-label fallback made the same real-browser test GREEN.
+- Popup-choice settling: a menu option whose dialog closed 65 ms after click was followed by an observation that still contained the modal; focused test exited 1. A popup-specific bounded disappearance wait made the same real-browser test GREEN.
+
+Neither behavior contains Google-specific selectors, airport names, dates, prices, or scripted actions. The pre-existing 50 ms/two-frame settle remains for ordinary clicks; only observed popup choices use the bounded owner/target disappearance check.
+
+### Final specification self-review
+
+The descendant-label fallback improves the model-visible accessible name without changing identity, visibility, candidate limits, redaction, freshness, or actionability. Popup settling occurs only after an already executed click; it does not replay or authorize another action. It waits for the clicked popup choice or its owning popup to disappear and remains bounded.
+
+The active runtime still keeps the 0.30 confidence threshold, maximum two read-only pre-dispatch refreshes, maximum 12 browser actions, eight writer calls in the public harness, and the no-booking/payment/account restrictions. The separate 24-decision ceiling only allows additional observations/plans and does not expand browser mutation authority. Specification self-review accepts this patch.
+
+### Final code-quality/safety self-review
+
+Reviewed the exact five-file diff after the specification pass. The popup wait runs with an existing element handle inside its normal disposal scope; evaluation failures degrade to the existing bounded settle behavior rather than causing action replay. The child ARIA label is redacted by the same downstream name pipeline and is capped by the existing 220-character candidate label budget.
+
+Detached-head RED checks and active-worktree GREEN checks are preserved in terminal evidence. The complete active worktree then passed 116 Vitest tests in 29 files, 29 Node integration checks, typecheck, build, 10/10 canonical extension/relay journeys, and 10/10 additional deterministic journeys. Quality/safety self-review accepts the patch for live/public-site verification; this remains a self-review under the user's subagent waiver.
+
+
+## Public-flight date-picker follow-through
+
+The `220d507` public trace proved the airport path now works: origin autocomplete was selected, destination autocomplete was selected, and both route endpoints became visible. The remaining loop was the Departure control: Jev chose `fill_item` four times, consuming writer calls, before finally clicking the date field and becoming uncertain in the calendar.
+
+A new planner-contract test was added first and observed RED: the shared policy contained no date-picker/calendar guidance. The minimal change adds one generic rule: date/calendar fields should be clicked, then a visible requested date and required confirmation clicked; they should not be repeatedly filled as free text. The focused test is GREEN.
+
+### Specification self-review
+
+The rule is generic to date-picker/calendar interactions and contains no Google hostname, airport, date, price, DOM selector, reference ID, or forced action. It does not alter the user's goal, the 0.30 confidence floor, two pre-dispatch refreshes, 12-browser-action cap, 24-decision ceiling, public writer budget, or no-booking restrictions. Jev still chooses the operation and observed target dynamically. Specification self-review accepts this scoped change.
+
+### Code-quality/safety self-review
+
+The production diff is a single planner-policy string extension. It does not bypass operation-specific target heads or browser freshness/actionability checks. The test observes the actual external request packet rather than an internal helper. Full verification after the change passed 117 Vitest tests in 29 files, 29 Node integration checks, typecheck, production build, and `git diff --check`. Quality/safety self-review accepts the patch for a fresh exact-head public-site run.
+
+## Click-preferred date-editor follow-through
+
+The `a2a93ff` public trace confirmed airport autocomplete is fixed: origin and destination both reached visible matching suggestions and were selected. The remaining failure moved to the date editor. Google Flights exposes Departure as an ordinary text input, but its own `aria-describedby` says to enter a date or use arrow keys to change the current date. Jev therefore kept receiving it as a fill target and spent four writer calls before opening the calendar.
+
+A new real-browser RED test first showed that this semantically date-controlled text input was still reported as an ordinary fill target. The observer now derives only a bounded internal `preferredAction` hint from strong date-picker signals (native date-like input types, “calendar”, “date picker”, or an arrow-key date instruction). The hint text itself is not forwarded to model state.
+
+A second RED test protected ordinary date text fields: a hint such as “Enter a date as YYYY-MM-DD” must remain fill-preferred. This drove the heuristic from a broad word “date” match to the narrower picker signals above. The planner’s fill target head and the available-action set both exclude click-preferred fields; those controls remain normal click candidates and keep all browser freshness/actionability checks.
+
+A third RED/GREEN planner test covers the original prompt’s month-only ambiguity. When a goal names a month but no day, the policy tells Jev to choose the earliest available selectable date in that month. If the UI requires a paired return date but the user did not request one, it prefers an available single-date/one-way mode rather than inventing a return date. This does not alter the user prompt or the public evidence requirements.
+
+### Date-editor stage 1 — specification self-review
+
+The implementation changes the dynamic action space rather than scripting Google Flights. No hostname, CSS class, airport, reference ID, December date, or price is embedded in production logic. The browser still observes the actual field and calendar controls; Jev still chooses the click target. The 0.30 confidence threshold, two read-only pre-dispatch recoveries, 12-browser-action cap, 24-decision ceiling, writer-call budget, and no-booking/account/payment restrictions remain intact.
+
+The first review rejected an over-broad implementation that would have exposed the full `aria-describedby` text to the model and treated any mention of “date” as a picker. The corrected implementation keeps the description browser-internal and requires stronger semantic signals. Specification self-review accepts the narrowed behavior.
+
+### Date-editor stage 2 — code-quality/safety self-review
+
+After the specification pass, the exact runtime/test diff was re-read. `preferredAction` is optional and additive, so existing observation consumers remain compatible. It only removes unsafe/inappropriate free-text operations from the model’s available action set; it does not make a non-clickable control executable or bypass action-time guards. Sensitive fields still fail the same checks and no `aria-describedby` text is copied into model-facing state.
+
+The tightened implementation completed all local gates on Oracle `free`: **121 Vitest tests in 29 files**, **30 Node integration checks**, typecheck, production build, **10/10** canonical Browser Control extension/relay journeys, and **10/10** additional deterministic journeys. Controlled fixture measurements in this pass were approximately **155 ms** focus-click median, **91 ms** redirect navigation, and **168 ms** Back recovery. These are fixture measurements, not universal website claims. Quality/safety self-review accepts the patch for secret-backed live/public-flight verification.
+
+## Calendar viewport navigation follow-through
+
+The `9f5bf6b` public run proved the date editor routing fix worked: no date writer loop remained. It opened the calendar and then stopped at 0.29 confidence with 63 visible controls. A credential-free Google Flights DOM probe showed those controls contained September through November plus a visible `Next` button; December date nodes were outside the viewport and therefore correctly excluded from the observation. Clicking that observed `Next` button made fully labeled December 2026 dates visible.
+
+A planner policy test was tightened to inspect the policy itself and observed RED before production change. The minimal GREEN adds generic guidance: when the requested calendar month/date is absent from current visible controls, use observed Next/Previous calendar navigation until it appears rather than re-clicking the field or choosing another month.
+
+### Calendar-navigation stage 1 — specification self-review
+
+The behavior is driven entirely by current observed controls and the user's requested month/date. It does not assume Google, December, a fixed number of Next clicks, DOM coordinates, candidate refs, or a site-specific calendar shape. Jev remains responsible for choosing both the operation and the observed target. The existing 0.30 confidence floor, action/recovery budgets, and browser freshness/actionability checks remain unchanged. Specification self-review accepts the scoped rule.
+
+### Calendar-navigation stage 2 — code-quality/safety self-review
+
+After the specification pass, the exact change was re-read. Production code changes only the planner policy string; no browser executor, selector, observation bound, transport, model selection, credential handling, or mutation budget changed. The new test inspects the actual packet sent to the external TypeSafe boundary, preventing a false GREEN caused merely by a candidate named “Next” elsewhere in the request.
+
+A direct public-page probe independently confirmed that one real Next click transitions the visible calendar controls to include December dates. Final local verification after the rule passed **122 Vitest tests in 29 files**, **30 Node integration checks**, typecheck, build, **10/10** canonical extension/relay journeys, and **10/10** additional deterministic journeys. Quality/safety self-review accepts this iteration for secret-backed public acceptance. This is a self-review under the user's subagent waiver, not external approval.
+
+## Operation-specific target grounding
+
+The `4c89823` public run still stopped in the first calendar viewport even after explicit navigation guidance. Its click decision had 63 compatible refs but the target criteria values were null, so the target head had to correlate opaque refs back to the shared control table. The linked `browser-use/jev-ultrafast` implementation instead supplies compact element semantics directly inside every operation-specific target head.
+
+The existing compactness test was changed first and observed RED: a unique button label appeared only once in shared state and not in the click target head. The minimal implementation gives each compatible target a bounded description containing its already-redacted label plus safe current value/preferred-action metadata. Incompatible controls are still absent from each head. The same test is GREEN with the label appearing once in shared controls and once in the compatible click head.
+
+### Target-grounding stage 1 — specification self-review
+
+This preserves one TypeSafe request per decision cycle and speculative operation-specific target heads. It does not change which elements are observable or executable; it only makes an already-compatible target choice self-describing. The target description is capped at 320 characters, and fill heads still exclude non-editable, sensitive, and click-preferred fields.
+
+The reliability tradeoff intentionally reintroduces bounded duplication of a target's display label. This supersedes the earlier “label exactly once” optimization because live evidence showed opaque target criteria materially degraded selection confidence on large dynamic controls. No browser action, confidence threshold, recovery budget, or site-specific behavior is added. Specification self-review accepts the tradeoff.
+
+### Target-grounding stage 2 — code-quality/safety self-review
+
+After the specification pass, the exact two-file runtime/test diff was reviewed. Target descriptions are built only from the observer's existing candidate label and field metadata. Sensitive fields contribute no current-value detail; non-sensitive current values were already present in shared model state. No private reference signatures or raw DOM objects are added. Descriptions are plain strings and cannot become selectors, coordinates, JavaScript, or browser commands.
+
+The target helper is local to the planner and does not widen its public interface. The existing fallback for injected legacy test clients remains unchanged. Full Oracle verification after this change passed **122 Vitest tests in 29 files**, **30 Node integration checks**, typecheck, production build, **10/10** canonical extension/relay journeys, and **10/10** additional deterministic journeys. Controlled fixture results were about **157 ms** focus-click median, **84 ms** redirect navigation, and **140 ms** Back recovery. Quality/safety self-review accepts this patch for a fresh secret-backed run; these are self-reviews, not independent approval.

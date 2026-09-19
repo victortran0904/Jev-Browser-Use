@@ -1,0 +1,31 @@
+# Review stage 1 — reconciled specification compliance
+
+Reviewer: implementing assistant in a separate self-review pass, under the explicit user waiver of subagents. This is not independent-agent or external approval.
+
+Reviewed the eight-task plan, both divergent histories, unified boundary/observer/run controller, live harness and preserved behavioral tests.
+
+Resolved findings: action-availability filtering; field identity in focused/direct-fill history without typed values; allowlisted model metadata; harmless wait across navigation while mutations remain guarded; current-readiness checks for Back/BFCache recovery; dated-itinerary acceptance that rejects unrelated cheap prices. Actual RED/GREEN evidence is recorded in TDD.md, cycles 47–52.
+
+Causal popup ownership and original POST state are preserved without global-new-tab heuristics or URL replay. Run/session APIs, one-request kind/site/item planning, completion-evidence instructions, the 12-step limit, low-confidence stop, screenshot opt-in and initial-URL shortcut remain. Reference identity is separate from observation/document freshness. Caching reuses candidate membership; geometry, fields and bounded text are reread. Uncertain mutations cause full collection.
+
+The old targetSource test asserted an obsolete option. Its replacement uses real Chromium to verify owned popup continuation, one destination request and survival of an unrelated session. This migration is not represented as a new product RED/GREEN fix.
+
+## Actual acceptance
+
+On the requested VPS: 65 Vitest tests, 22 additional Node checks, typecheck, build, six harness assertions and both ten-case real-relay deterministic suites passed. Native POST/delayed popups and concurrent-session ownership now pass through the actual extension transport.
+
+## Scope precision
+
+Direct fill is implemented; arbitrary compound submission is intentionally excluded. Full/incremental/focused describes collection, not stateful model deltas. Renderer/boundary/screenshot/payload and writer/browser/planner timings are exposed; relay-internal queue and provider compute time are not invented. Rich cross-origin iframe/shadow-root extraction remains outside this lightweight observer.
+
+The exact flight prompt is preserved. Acceptance separately assumes December 2026 and CAD; those assumptions are not attributed to the ambiguous user text. Public testing requires dated itinerary evidence and permits no booking or CAPTCHA bypass. Live provider/public-site results must be reported from the exact Actions run, not inferred from fixture success.
+
+Status: local architecture specification checks passed with these documented limits. External acceptance remains separately reported.
+
+## First exact-head Actions attempt
+
+Oracle run 35270000518 stopped at regression: 59/65 passed, with concurrent browser startup/test timeouts and a timing threshold failure. No provider secrets were used. The follow-up schedules Vitest with one worker on this shared VPS only; no test is removed and no explicit timing/assertion threshold is relaxed. The same exact clean checkout passed all 65 tests with one worker, with the 800 ms focus and 1,200 ms navigation thresholds unchanged. Both review stages accept this scheduling-only change; the original failed run remains visible. This is a harness scheduling adjustment, not a claimed application RED/GREEN fix.
+
+## Provider-run follow-up review
+
+Exact-head run 35270540088 passed all deterministic checks and 9/10 live journeys, then Gemini HTTP 429 prevented the flight fixture and public navigation. Reviewed the narrowly scoped harness correction: deterministic narration with actual planner/writer/browser, separately reported 4,500 ms Gemini pacing, bounded requests and corrected `fill_item` trace label. No assertion was weakened, no credential changed and no failed result erased. Cycles 53–54 have real RED/GREEN evidence. This follow-up changes test orchestration only, not production behavior; full live outcomes remain separately reported.
