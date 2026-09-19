@@ -234,3 +234,21 @@ it("gives deterministic guidance for month-only travel dates without inventing a
   expect(payload).toMatch(/earliest.*available|earliest.*selectable/i);
   expect(payload).toMatch(/return date.*not.*request|single-date|one-way/i);
 });
+
+
+it("tells the planner to navigate a calendar when the requested month is not yet a visible target", async () => {
+  let captured: any;
+  const answer = (choice: string) => ({ type: "choice" as const, choice, confidence: 1, probabilities: { [choice]: 1 } });
+  const planner = createPlanner({ systemOne: async request => {
+    captured = request;
+    return { answers: { kind: answer("click_item"), site: answer("no_site"), click_target: answer("e3"), fill_target: answer("no_fill_target") } };
+  } });
+  await planner.plan({ goal: "Find flights in December", history: ["clicked Departure"], observation: {
+    id: "calendar-nav", url: "https://example.com", title: "Calendar", snapshot: "", pageText: "October November", candidates: [
+      { ref: "e1", label: 'button "Sunday, November 29, 2026"' },
+      { ref: "e2", label: 'button "Monday, November 30, 2026"' },
+      { ref: "e3", label: 'button "Next"' },
+    ],
+  } });
+  expect(captured.state.policy).toMatch(/(?:requested|target).*(?:month|date).*(?:not|isn.t).*(?:visible|current).*(?:Next|Previous)|(?:Next|Previous).*until.*(?:month|date)/i);
+});

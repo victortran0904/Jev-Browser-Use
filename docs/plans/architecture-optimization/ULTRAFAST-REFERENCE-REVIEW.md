@@ -126,3 +126,19 @@ The first review rejected an over-broad implementation that would have exposed t
 After the specification pass, the exact runtime/test diff was re-read. `preferredAction` is optional and additive, so existing observation consumers remain compatible. It only removes unsafe/inappropriate free-text operations from the model’s available action set; it does not make a non-clickable control executable or bypass action-time guards. Sensitive fields still fail the same checks and no `aria-describedby` text is copied into model-facing state.
 
 The tightened implementation completed all local gates on Oracle `free`: **121 Vitest tests in 29 files**, **30 Node integration checks**, typecheck, production build, **10/10** canonical Browser Control extension/relay journeys, and **10/10** additional deterministic journeys. Controlled fixture measurements in this pass were approximately **155 ms** focus-click median, **91 ms** redirect navigation, and **168 ms** Back recovery. These are fixture measurements, not universal website claims. Quality/safety self-review accepts the patch for secret-backed live/public-flight verification.
+
+## Calendar viewport navigation follow-through
+
+The `9f5bf6b` public run proved the date editor routing fix worked: no date writer loop remained. It opened the calendar and then stopped at 0.29 confidence with 63 visible controls. A credential-free Google Flights DOM probe showed those controls contained September through November plus a visible `Next` button; December date nodes were outside the viewport and therefore correctly excluded from the observation. Clicking that observed `Next` button made fully labeled December 2026 dates visible.
+
+A planner policy test was tightened to inspect the policy itself and observed RED before production change. The minimal GREEN adds generic guidance: when the requested calendar month/date is absent from current visible controls, use observed Next/Previous calendar navigation until it appears rather than re-clicking the field or choosing another month.
+
+### Calendar-navigation stage 1 — specification self-review
+
+The behavior is driven entirely by current observed controls and the user's requested month/date. It does not assume Google, December, a fixed number of Next clicks, DOM coordinates, candidate refs, or a site-specific calendar shape. Jev remains responsible for choosing both the operation and the observed target. The existing 0.30 confidence floor, action/recovery budgets, and browser freshness/actionability checks remain unchanged. Specification self-review accepts the scoped rule.
+
+### Calendar-navigation stage 2 — code-quality/safety self-review
+
+After the specification pass, the exact change was re-read. Production code changes only the planner policy string; no browser executor, selector, observation bound, transport, model selection, credential handling, or mutation budget changed. The new test inspects the actual packet sent to the external TypeSafe boundary, preventing a false GREEN caused merely by a candidate named “Next” elsewhere in the request.
+
+A direct public-page probe independently confirmed that one real Next click transitions the visible calendar controls to include December dates. Final local verification after the rule passed **122 Vitest tests in 29 files**, **30 Node integration checks**, typecheck, build, **10/10** canonical extension/relay journeys, and **10/10** additional deterministic journeys. Quality/safety self-review accepts this iteration for secret-backed public acceptance. This is a self-review under the user's subagent waiver, not external approval.
