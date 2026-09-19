@@ -109,7 +109,8 @@ export function createRunController(deps: RunControllerOptions = {}) {
             durationMs: planMs,
             phase: "plan",
           });
-          if ((action.confidence ?? 1) < 0.3) {
+          const passiveAction = ["press_escape", "wait", "scroll_down", "scroll_up"].includes(action.kind);
+          if ((action.confidence ?? 1) < 0.3 && !passiveAction) {
             const refreshStart = performance.now();
             const refreshed = await browser.observe(run.id, screenshotPath);
             const refreshedMs = performance.now() - refreshStart;
