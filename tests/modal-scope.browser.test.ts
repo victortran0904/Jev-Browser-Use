@@ -35,3 +35,17 @@ it('refuses an old background fill if a modal opens after planning', async () =>
     expect(await f.page.locator('input').inputValue()).toBe('');
   } finally { await f.close(); }
 }, 15000);
+
+it('lets a clicked menu option settle for a bounded frame window before the next observation', async () => {
+  const f = await browserFixture(`<input aria-label="Background search"><div role="dialog" aria-modal="true"><div role="option"
+    onclick="setTimeout(()=>document.querySelector('[role=dialog]').remove(),30)">One way</div></div>`);
+  try {
+    let observation = await f.boundary.observe('test');
+    const option = observation.candidates.find(item => item.label.includes('One way'));
+    expect(option).toBeDefined();
+    await f.boundary.act('test', {kind:'click_item', target:option!.ref, observationId:observation.id}, observation);
+    observation = await f.boundary.observe('test');
+    expect(observation.candidates.some(item => item.label.includes('Background search'))).toBe(true);
+    expect(observation.candidates.some(item => item.label.includes('One way'))).toBe(false);
+  } finally { await f.close(); }
+}, 15000);

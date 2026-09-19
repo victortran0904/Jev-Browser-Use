@@ -141,3 +141,44 @@ it("provides control semantics to independently evaluated action questions", asy
   } });
   expect(action).toMatchObject({ kind: "click_item", target: "e1" });
 });
+
+
+it("tells the planner to select a visible autocomplete suggestion before submitting", async () => {
+  let captured: any;
+  const planner = createPlanner({ systemOne: async request => {
+    captured = request;
+    const answer = (choice: string) => ({ type: "choice" as const, choice, confidence: 1, probabilities: { [choice]: 1 } });
+    return { answers: { kind: answer("click_item"), site: answer("no_site"), item: answer("e2") } };
+  } });
+  await planner.plan({ goal: "Fly from Hanoi", history: ["filled Origin"], observation: {
+    id: "autocomplete", url: "https://example.com", title: "Flights", snapshot: "", pageText: "Choose origin",
+    candidates: [
+      { ref: "e1", label: 'combobox "Origin"', field: { label: "Origin", placeholder: "", value: "Hanoi", isText: true } },
+      { ref: "e2", label: 'option "Hanoi (HAN)"' },
+    ],
+  } });
+  expect(JSON.stringify(captured)).toMatch(/autocomplete.*suggestion.*before.*submit/i);
+});
+
+it("uses separate speculative target heads so fill choices contain only editable fields", async () => {
+  let captured: any;
+  const answer = (choice: string, confidence = 1) => ({ type: "choice" as const, choice, confidence, probabilities: { [choice]: confidence } });
+  const planner = createPlanner({ systemOne: async request => {
+    captured = request;
+    return { answers: {
+      kind: answer("fill_item", 0.9), site: answer("no_site"),
+      click_target: answer("e2", 0.7), fill_target: answer("e1", 0.85),
+    } };
+  } });
+  const action = await planner.plan({ goal: "Enter Hanoi", history: [], observation: {
+    id: "heads", url: "https://example.com", title: "Flights", snapshot: "", pageText: "Flight search", candidates: [
+      { ref: "e1", label: 'combobox "Origin"', field: { label: "Origin", placeholder: "", value: "", isText: true } },
+      { ref: "e2", label: 'button "Search"' },
+    ],
+  } });
+  expect(action).toMatchObject({ kind: "fill_item", target: "e1", confidence: 0.85 });
+  expect(Object.keys(captured.questions.fill_target.criteria)).toContain("e1");
+  expect(Object.keys(captured.questions.fill_target.criteria)).not.toContain("e2");
+  expect(Object.keys(captured.questions.click_target.criteria)).toEqual(expect.arrayContaining(["e1", "e2"]));
+  expect(captured.questions).not.toHaveProperty("item");
+});

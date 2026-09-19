@@ -177,6 +177,8 @@ export function createBrowserBoundary(
             if (!target) throw new Error("Stale browser target; observe again");
             await target.click({ timeout: 5000 });
           } finally { await handle.dispose(); }
+          const settle = page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))).catch(() => undefined);
+          await Promise.race([settle, page.waitForTimeout(50)]);
           return ${JSON.stringify(`clicked ${observation.candidates.find((item) => item.ref === action.target)?.label ?? action.target}`)};`,
         fill_item: targetFillScript(observation.documentId, action.target, action.value ?? "", observation.candidates.find(item => item.ref === action.target)?.field?.label || "observed text field"),
         type_text: focusedFillScript(observation.documentId, action.value ?? "", observation.focusedField?.label || observation.focusedField?.placeholder || "focused field"),

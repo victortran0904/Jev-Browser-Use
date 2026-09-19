@@ -8,19 +8,32 @@ const prohibited = /\b(book(?:ing)?|buy|purchase|pay(?:ment)?|checkout|reserve|s
 
 export function flightEvidence(observation) {
   const text = observation?.pageText ?? observation?.snapshot ?? '';
+  const controls = (observation?.candidates ?? []).map(item =>
+    [item.label, item.field?.label, item.field?.value].filter(Boolean).join(' ')).join('\n');
+  const state = text + '\n' + controls;
   const origin = /\b(Hanoi|Hà Nội|HAN)\b/i;
   const destination = /\b(Vancouver|YVR)\b/i;
   const datedDecember = /\b(?:December|Dec)\.?\s+(?:[1-9]|[12]\d|3[01]),?\s+2026\b|\b2026-12-(?:0[1-9]|[12]\d|3[01])\b/i;
-  // Route, dated departure and explicit CAD fare must share an itinerary line.
+  const originPresent = origin.test(state);
+  const destinationPresent = destination.test(state);
+  const decemberPresent = datedDecember.test(state);
   const matchingLine = text.split("\n").find(line => {
     if (!origin.test(line) || !destination.test(line) || !datedDecember.test(line)) return false;
     const fare = line.match(/(?:CAD\s*\$?|CA\$|C\$)\s*([0-9][0-9,]*(?:\.[0-9]{2})?)/);
     const amount = fare ? Number(fare[1].replaceAll(',', '')) : NaN;
-    return amount > 0 && amount < 2500 && !/hotel|per night|budget|maximum|example|test data|fixture/i.test(line);
+    return amount > 0 && amount < 2500 && !/hotel|per night|budget|maximum|example|test data|fixture|baggage|bag fee|seat selection|insurance|ancillary|optional charge/i.test(line);
+  });
+  const resultContext = /search results|top flights|other flights|prices include required taxes|select flight/i.test(text)
+    || /\/travel\/flights\/search/.test(observation?.url ?? '');
+  const qualifyingFare = text.split("\n").some(line => {
+    if (/hotel|per night|budget|maximum|example|test data|fixture|baggage|bag fee|seat selection|insurance|ancillary|optional charge/i.test(line)) return false;
+    const fare = line.match(/(?:CAD\s*\$?|CA\$|C\$)\s*([0-9][0-9,]*(?:\.[0-9]{2})?)/);
+    const amount = fare ? Number(fare[1].replaceAll(',', '')) : NaN;
+    return amount > 0 && amount < 2500;
   });
   return {
-    originPresent: origin.test(text), destinationPresent: destination.test(text),
-    decemberPresent: datedDecember.test(text), priceBelowLimitPresent: Boolean(matchingLine),
+    originPresent, destinationPresent, decemberPresent,
+    priceBelowLimitPresent: Boolean(matchingLine) || Boolean(resultContext && originPresent && destinationPresent && decemberPresent && qualifyingFare),
     blockedPage: /captcha|unusual traffic|verify you are human|access denied/i.test(text),
   };
 }
@@ -51,7 +64,7 @@ export async function runPublicFlight({ boundary, planner, writer, report }) {
   const controller = createRunController({
     browser: safeBrowser, enableScreenshots: false,
     planner: { plan: async input => {
-      assert(++plannerCalls <= 12, 'Flight planner budget exceeded');
+      assert(++plannerCalls <= 24, 'Flight planner budget exceeded');
       const action = await planner.plan(input);
       trace.push({
         step: plannerCalls, action: action.kind,

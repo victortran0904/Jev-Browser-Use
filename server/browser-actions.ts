@@ -3,10 +3,25 @@
 const editorReadinessScript = `
   await page.waitForFunction(el => {
     const popup = el.getAttribute("aria-haspopup");
-    if (el.getAttribute("role") !== "combobox" && popup !== "dialog" && popup !== "listbox") return true;
-    if (!el.isConnected || el.getAttribute("aria-expanded") === "true") return true;
+    const combobox = el.getAttribute("role") === "combobox";
+    if (!combobox && popup !== "dialog" && popup !== "listbox") return true;
+    if (!el.isConnected) return true;
+    const visible = node => {
+      const rect = node.getBoundingClientRect();
+      const style = getComputedStyle(node);
+      return rect.width > 0 && rect.height > 0 && rect.bottom > 0 && rect.top < innerHeight
+        && rect.right > 0 && rect.left < innerWidth && style.display !== "none" && style.visibility !== "hidden";
+    };
+    if (combobox) {
+      const ids = (el.getAttribute("aria-controls") || el.getAttribute("aria-owns") || "")
+        .split(/\\s+/).filter(Boolean);
+      const roots = ids.length ? ids.map(id => document.getElementById(id)).filter(Boolean) : [document];
+      const options = roots.flatMap(root => Array.from(root.querySelectorAll('[role="option"]')));
+      return options.some(visible);
+    }
+    if (el.getAttribute("aria-expanded") === "true") return true;
     const active = document.activeElement;
-    return active && active !== el && active !== document.body && active.getBoundingClientRect().width > 0;
+    return active && active !== el && active !== document.body && visible(active);
   }, element, { timeout: 750 }).catch(error => {
     if (error.name !== "TimeoutError") throw error;
   });

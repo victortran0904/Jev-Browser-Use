@@ -8,4 +8,4 @@ The useful behaviors (coherent title/URL collection, focused-field refresh and m
 
 ## Inactive follow-up experiments
 
-`deferred-writer-deadline.test.ts.txt` and `deferred-uncertain-state-recovery.test.ts.txt` preserve genuine failing experiments whose implementation commands were blocked before execution. They are documentation artifacts, not active tests or implemented fixes. Do not include them in passing-test totals or apply them as production patches. Their limitations and actual logs are recorded in COMPLETION-REVIEW.md.
+`deferred-writer-deadline.test.ts.txt` remains an inactive failing experiment whose implementation was not applied. `historical-uncertain-state-recovery-red.test.ts.txt` preserves the earlier RED case for changed-state low-confidence recovery; that behavior was subsequently implemented test-first and is now covered by the active `tests/uncertain-state-recovery.test.ts`. The historical file is evidence only, not a test to execute.

@@ -34,3 +34,15 @@ it('fills an ordinary field without an unrelated editor deadline', async () => {
     expect(await f.page.locator('input').inputValue()).toBe('query');
   } finally { await f.close(); }
 }, 15000);
+
+
+it('does not treat aria-expanded as ready until a visible combobox option arrives', async () => {
+  const f = await browserFixture(`<input aria-label="Origin" role="combobox" aria-controls="airports" aria-expanded="false"
+    oninput="this.setAttribute('aria-expanded','true');setTimeout(()=>{const o=document.createElement('div');o.id='airports';o.innerHTML='<div role=option>Hanoi HAN</div>';document.body.append(o);},500)">`);
+  try {
+    let observation = await f.boundary.observe('test');
+    await f.boundary.act('test', {kind:'fill_item', target:observation.candidates[0].ref, value:'Hanoi', observationId:observation.id}, observation);
+    observation = await f.boundary.observe('test');
+    expect(observation.candidates.some(item => item.label === 'option "Hanoi HAN"')).toBe(true);
+  } finally { await f.close(); }
+}, 15000);

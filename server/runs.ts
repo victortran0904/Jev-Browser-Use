@@ -45,17 +45,23 @@ export function createRunController(deps: RunControllerOptions = {}) {
     const history: string[] = [];
     let consecutiveNoops = 0;
     let preDispatchRecoveries = 0;
+    let browserActionCount = 0;
+    let pendingObservation: Observation | undefined;
+    let pendingObserveMs = 0;
     let lastResult = "";
     let lastState = "";
     try {
-      while (run.stepCount < 12 && !run.stopped) {
+      while (run.stepCount < 24 && !run.stopped) {
         const stepStart = performance.now();
         const screenshotPath = enableScreenshots ? path.resolve(".runs", run.id, String(run.stepCount), "screenshot.png") : undefined;
 
         const observeStart = performance.now();
         const initialUrl = run.stepCount === 0 ? extractExplicitUrl(run.goal) : null;
-        const observation: Observation = initialUrl ? { id: randomUUID(), url: "about:blank", title: "Neutral session", snapshot: "", pageText: "", candidates: [] } : await browser.observe(run.id, screenshotPath);
-        const observeMs = performance.now() - observeStart;
+        const observation: Observation = pendingObservation
+          ?? (initialUrl ? { id: randomUUID(), url: "about:blank", title: "Neutral session", snapshot: "", pageText: "", candidates: [] } : await browser.observe(run.id, screenshotPath));
+        const observeMs = pendingObservation ? pendingObserveMs : performance.now() - observeStart;
+        pendingObservation = undefined;
+        pendingObserveMs = 0;
         if (run.stopped || run.status !== "running") return;
         run.observation = observation;
         run.screenshotPath = initialUrl ? undefined : screenshotPath;
@@ -104,6 +110,23 @@ export function createRunController(deps: RunControllerOptions = {}) {
             phase: "plan",
           });
           if ((action.confidence ?? 1) < 0.3) {
+            const refreshStart = performance.now();
+            const refreshed = await browser.observe(run.id, screenshotPath);
+            const refreshedMs = performance.now() - refreshStart;
+            const stateKey = (value: Observation) => JSON.stringify({
+              documentId: value.documentId, url: value.url, snapshot: value.snapshot,
+              focusedValue: value.focusedField?.value ?? "", focusedLabel: value.focusedField?.label ?? "",
+            });
+            if (stateKey(refreshed) !== stateKey(observation) && ++preDispatchRecoveries <= 2) {
+              pendingObservation = refreshed;
+              pendingObserveMs = refreshedMs;
+              history.push("Page changed while the decision was uncertain; no action was sent. Replan from the fresh observation.");
+              emit(run, "state_refresh", "Page changed before a low-confidence action; replanning", {
+                observationId: observation.id, kind: action.kind, dispatched: false,
+                attempt: preDispatchRecoveries, confidence: action.confidence ?? 0, phase: "observe",
+              });
+              continue;
+            }
             run.status = "error";
             run.error = `Jev confidence ${(action.confidence ?? 0).toFixed(2)} was below 0.30`;
             emit(run, "run_error", run.error);
@@ -116,8 +139,16 @@ export function createRunController(deps: RunControllerOptions = {}) {
           }
         }
 
+        if (browserActionCount >= 12) {
+          run.status = "error";
+          run.error = "Reached the 12-browser-action limit before the goal was complete";
+          emit(run, "run_error", run.error);
+          return;
+        }
+
         const actStart = performance.now();
         let writerMs = 0;
+        let browserActionExecuted = false;
         const timeWriter = async <T>(work: () => Promise<T>): Promise<T> => {
           const start = performance.now();
           try { return await work(); } finally { writerMs += performance.now() - start; }
@@ -129,7 +160,10 @@ export function createRunController(deps: RunControllerOptions = {}) {
             const explicitUrl = extractExplicitUrl(run.goal);
             const url = action.url || knownUrl || (action.site === "other" ? (explicitUrl ?? await timeWriter(() => writer.generateUrl({ goal: run.goal, history }))) : explicitUrl);
             if (run.stopped || run.status !== "running") return;
-            result = url ? await browser.open(run.id, url) : "open_site refused: no catalog site matched and the writer supplied no valid URL";
+            if (url) {
+              result = await browser.open(run.id, url);
+              browserActionExecuted = true;
+            } else result = "open_site refused: no catalog site matched and the writer supplied no valid URL";
           } else if (action.kind === "type_text" || action.kind === "fill_item") {
             const field = action.kind === "fill_item" ? observation.candidates.find(item => item.ref === action.target)?.field : observation.focusedField;
             if (!field?.isText || field.sensitive) result = "type_text refused: no browser text field is focused";
@@ -137,10 +171,14 @@ export function createRunController(deps: RunControllerOptions = {}) {
               const generated = await timeWriter(() => writer.generateText({ goal: run.goal, history, observation: { ...observation, focusedField: field } }));
               if (run.stopped || run.status !== "running") return;
               if (!generated.fill || !generated.text) result = `type_text refused: ${generated.reason || "writer declined"}`;
-              else result = await browser.act(run.id, { ...action, value: generated.text }, observation);
+              else {
+                result = await browser.act(run.id, { ...action, value: generated.text }, observation);
+                browserActionExecuted = true;
+              }
             }
           } else {
             result = await browser.act(run.id, action, observation);
+            browserActionExecuted = true;
           }
         } catch (error) {
           if (!(error instanceof StaleObservationError) && !(error instanceof InvalidActionTargetError)) throw error;
@@ -154,6 +192,7 @@ export function createRunController(deps: RunControllerOptions = {}) {
         }
 
         if (run.stopped || run.status !== "running") return;
+        if (browserActionExecuted) browserActionCount += 1;
         const actMs = performance.now() - actStart;
         const browserMs = Math.max(0, actMs - writerMs);
         const totalStepMs = performance.now() - stepStart;
@@ -182,7 +221,7 @@ export function createRunController(deps: RunControllerOptions = {}) {
       }
       if (run.stopped) return;
       run.status = "error";
-      run.error = "Reached the 12-step limit before the goal was complete";
+      run.error = "Reached the 24-decision limit before the goal was complete";
       emit(run, "run_error", run.error);
     } catch (error) {
       if (run.stopped) return;
