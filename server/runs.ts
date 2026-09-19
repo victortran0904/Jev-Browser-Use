@@ -140,9 +140,9 @@ export function createRunController(deps: RunControllerOptions = {}) {
           }
         }
 
-        if (browserActionCount >= 12) {
+        if (browserActionCount >= 18) {
           run.status = "error";
-          run.error = "Reached the 12-browser-action limit before the goal was complete";
+          run.error = "Reached the 18-browser-action limit before the goal was complete";
           emit(run, "run_error", run.error);
           return;
         }

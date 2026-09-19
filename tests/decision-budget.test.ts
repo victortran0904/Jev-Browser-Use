@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest';
 import { createRunController } from '../server/runs.js';
 
-it('allows extra model decisions while keeping browser actions capped at twelve', async () => {
+it('allows a complex form to use up to eighteen browser actions within the decision budget', async () => {
   let observations = 0, decisions = 0, actions = 0;
   const controller = createRunController({ enableScreenshots: false,
     browser: {
@@ -13,20 +13,20 @@ it('allows extra model decisions while keeping browser actions capped at twelve'
     planner: { plan: async ({ observation }) => {
       decisions += 1;
       if (decisions === 1) return { kind: 'click_item', target: 'e1', observationId: observation.id, confidence: 0.2 };
-      if (actions < 12) return { kind: 'click_item', target: 'e1', observationId: observation.id, confidence: 1 };
+      if (actions < 18) return { kind: 'click_item', target: 'e1', observationId: observation.id, confidence: 1 };
       return { kind: 'done', observationId: observation.id, confidence: 1 };
     } },
     narrator: { acknowledge: async () => 'Started', summarize: async () => 'Finished' },
   });
-  const run = controller.start({ goal: 'Complete a dynamic twelve-action flow' });
+  const run = controller.start({ goal: 'Complete a dynamic eighteen-action flow' });
   await controller.settled(run.id);
   expect(run.status).toBe('complete');
-  expect(actions).toBe(12);
-  expect(decisions).toBe(14);
-  expect(run.stepCount).toBe(14);
+  expect(actions).toBe(18);
+  expect(decisions).toBe(20);
+  expect(run.stepCount).toBe(20);
 });
 
-it('never executes a thirteenth browser action even when decision budget remains', async () => {
+it('never executes a nineteenth browser action even when decision budget remains', async () => {
   let actions = 0, observations = 0;
   const controller = createRunController({ enableScreenshots: false,
     browser: {
@@ -41,7 +41,7 @@ it('never executes a thirteenth browser action even when decision budget remains
   const run = controller.start({ goal: 'Keep clicking' });
   await controller.settled(run.id);
   expect(run.status).toBe('error');
-  expect(run.error).toMatch(/12-browser-action limit/);
-  expect(actions).toBe(12);
-  expect(run.stepCount).toBe(13);
+  expect(run.error).toMatch(/18-browser-action limit/);
+  expect(actions).toBe(18);
+  expect(run.stepCount).toBe(19);
 });
